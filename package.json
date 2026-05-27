@@ -1,0 +1,50 @@
+{
+  "name": "pi-weighted-model-router",
+  "version": "0.1.0",
+  "description": "Pi extension that balances model/provider usage across weighted model pools.",
+  "type": "module",
+  "license": "MIT",
+  "author": "eiei114",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "model-router",
+    "weighted-routing",
+    "llm"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test",
+    "release:npm:dry": "npm pack --dry-run",
+    "prepublishOnly": "npm run check"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^0.75.5",
+    "@earendil-works/pi-coding-agent": "^0.75.5",
+    "@earendil-works/pi-tui": "^0.75.5",
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3",
+    "typebox": "^1.1.38",
+    "typescript": "^6.0.3"
+  }
+}

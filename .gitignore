@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.pi/npm/
+.pi/git/
+.pi/tmp/
+.pi/weighted-model-router/
+*.log
+*.tgz
+.env
+.env.*
+.DS_Store
