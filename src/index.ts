@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -8,6 +8,7 @@ import { Type } from "typebox";
 import { defaultConfig, fallbackStatuses, runtimeFallbackEnabled, validateConfigShape } from "./config.js";
 import { modelKey, todayKey } from "./keys.js";
 import { recordSuccess, successCounts } from "./ledger.js";
+import { formatUnknownModelMessage } from "./model-suggestions.js";
 import { rankDailyBalanced, withoutAttempted } from "./selector.js";
 import { readConfig, readLedger, readState, routerPaths, writeConfig, writeLedger, writeState } from "./storage.js";
 import type { ModelPoolEntry, RouterConfig, RouterLedger, RouterPaths, SelectedModel, StatusSnapshot } from "./types.js";
@@ -29,7 +30,24 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
   function shouldUseProjectLocalState(ctx: ExtensionContext): boolean {
     const projectSettingsPath = join(ctx.cwd, ".pi", "settings.json");
-    return resolve(ctx.cwd) === resolve(PACKAGE_ROOT) && existsSync(projectSettingsPath);
+    return existsSync(projectSettingsPath) && projectSettingsIncludesThisPackage(projectSettingsPath);
+  }
+
+  function projectSettingsIncludesThisPackage(projectSettingsPath: string): boolean {
+    try {
+      const settings = JSON.parse(readFileSync(projectSettingsPath, "utf8")) as unknown;
+      if (!isRecord(settings) || !Array.isArray(settings.packages)) return false;
+      return settings.packages.some((entry) => packageEntryMatchesThisPackage(entry, dirname(projectSettingsPath)));
+    } catch {
+      return false;
+    }
+  }
+
+  function packageEntryMatchesThisPackage(entry: unknown, settingsDir: string): boolean {
+    const source = typeof entry === "string" ? entry : isRecord(entry) && typeof entry.source === "string" ? entry.source : undefined;
+    if (!source) return false;
+    if (source.includes("pi-weighted-model-router")) return true;
+    return resolve(settingsDir, source) === resolve(PACKAGE_ROOT);
   }
 
   async function loadConfig(ctx: ExtensionContext): Promise<RouterConfig | undefined> {
@@ -314,13 +332,13 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 }
 
 function validateRegisteredModels(ctx: ExtensionContext, nextConfig: RouterConfig): void {
-  const missing: string[] = [];
+  const missing: ModelPoolEntry[] = [];
   for (const pool of Object.values(nextConfig.pools)) {
     for (const entry of pool.entries) {
-      if (!ctx.modelRegistry.find(entry.provider, entry.model)) missing.push(modelKey(entry));
+      if (!ctx.modelRegistry.find(entry.provider, entry.model)) missing.push(entry);
     }
   }
-  if (missing.length > 0) throw new Error(`Unknown model(s): ${missing.join(", ")}`);
+  if (missing.length > 0) throw new Error(formatUnknownModelMessage(missing, ctx.modelRegistry.getAll()));
 }
 
 function summarizeConfig(nextConfig: RouterConfig): string {
