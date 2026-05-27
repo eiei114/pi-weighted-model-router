@@ -29,6 +29,20 @@ test("smooth daily selection converges to configured weights over ten sessions",
   });
 });
 
+test("recording the first selection makes the next session prefer the next deficit", () => {
+  let ledger = emptyLedger();
+  const date = "2026-05-28";
+  const poolName = "main";
+
+  let result = selectDailyBalanced({ poolName, entries, ledger, date });
+  assert.equal(result.key, modelKey(entries[0]));
+
+  ledger = recordSuccess(ledger, date, poolName, result.key);
+  result = selectDailyBalanced({ poolName, entries, ledger, date });
+
+  assert.equal(result.key, modelKey(entries[1]));
+});
+
 test("config validation rejects duplicate models in the same pool", () => {
   assert.throws(
     () =>

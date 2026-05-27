@@ -126,6 +126,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       if (!success) continue;
 
       const attemptedKeys = [...new Set([...excludeKeys, candidate.key])];
+      const ledgerCommitted = await commitLedgerForSelection(candidate.key, poolName, options.preserveLedgerCommit ?? false);
       selected = {
         pool: poolName,
         provider: candidate.entry.provider,
@@ -134,7 +135,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
         reason,
         selectedAt: new Date().toISOString(),
         attemptedKeys,
-        ledgerCommitted: options.preserveLedgerCommit ?? false,
+        ledgerCommitted,
       };
       pi.appendEntry(SELECTION_ENTRY, selected);
       updateStatus(ctx);
@@ -143,6 +144,14 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
     ctx.ui.notify("Model router found no usable model in the selected pool.", "warning");
     return undefined;
+  }
+
+  async function commitLedgerForSelection(key: string, poolName: string, alreadyCommitted: boolean): Promise<boolean> {
+    if (alreadyCommitted || !ledger) return alreadyCommitted;
+
+    ledger = recordSuccess(ledger, todayKey(), poolName, key);
+    await writeLedger(paths.ledger, ledger);
+    return true;
   }
 
   function filterRegisteredAndCapable(ctx: ExtensionContext, entries: ModelPoolEntry[], inputs: string[]): ModelPoolEntry[] {
