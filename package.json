@@ -1,10 +1,18 @@
 {
   "name": "pi-weighted-model-router",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Pi extension that balances model/provider usage across weighted model pools.",
   "type": "module",
   "license": "MIT",
   "author": "eiei114",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eiei114/pi-weighted-model-router"
+  },
+  "homepage": "https://github.com/eiei114/pi-weighted-model-router#readme",
+  "bugs": {
+    "url": "https://github.com/eiei114/pi-weighted-model-router/issues"
+  },
   "keywords": [
     "pi-package",
     "pi-extension",
