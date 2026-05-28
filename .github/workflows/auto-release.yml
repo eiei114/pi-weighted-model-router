@@ -16,7 +16,7 @@ jobs:
       tag: ${{ steps.check.outputs.tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
 
@@ -62,12 +62,13 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ needs.release.outputs.tag }}
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
@@ -103,12 +104,19 @@ jobs:
         run: |
           name=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
-          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+          set +e
+          output=$(npm view "${name}@${version}" version 2>&1)
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
             echo "${name}@${version} is already published."
             echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
+          elif printf '%s' "$output" | grep -Eq 'E404|404 Not Found'; then
             echo "Publishing ${name}@${version}."
             echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$output" >&2
+            exit "$status"
           fi
 
       - name: Publish to npm
