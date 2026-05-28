@@ -1,7 +1,7 @@
 import { CONFIG_VERSION, type ModelPoolEntry, type RouterConfig } from "./types.js";
 import { modelKey } from "./keys.js";
 
-export const DEFAULT_FALLBACK_STATUSES = [429, 500, 502, 503, 504] as const;
+export const DEFAULT_FALLBACK_STATUSES = [400, 429, 500, 502, 503, 504] as const;
 
 export function defaultConfig(): RouterConfig {
   return {

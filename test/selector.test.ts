@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateConfigShape } from "../src/config.js";
+import { fallbackStatuses, validateConfigShape } from "../src/config.js";
 import { emptyLedger, recordSuccess } from "../src/ledger.js";
 import { modelKey } from "../src/keys.js";
 import { selectDailyBalanced } from "../src/selector.js";
@@ -80,4 +80,18 @@ test("config validation preserves named pools and fallback statuses", () => {
   assert.equal(config.defaultPool, "main");
   assert.deepEqual(config.runtimeFallback?.statuses, [429, 503]);
   assert.equal(config.pools.research.entries[0].label, "Cursor");
+});
+
+test("default fallback statuses include provider model rejection", () => {
+  const config = validateConfigShape({
+    version: 1,
+    defaultPool: "main",
+    pools: {
+      main: {
+        entries: [{ provider: "openai-codex", model: "gpt-5.5", weight: 7 }],
+      },
+    },
+  });
+
+  assert.equal(fallbackStatuses(config).has(400), true);
 });

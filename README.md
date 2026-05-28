@@ -7,7 +7,7 @@ Pi extension that selects a model from weighted pools at session start, then kee
 - Picks one model from a named pool when a pi session starts.
 - Uses a daily balanced weighted strategy, so `7 / 2 / 1` stays close to that ratio across sessions in the same day.
 - Restores the same selected model when a session is resumed.
-- Falls back to another pool candidate on retryable provider statuses such as `429`, `500`, `502`, `503`, and `504`.
+- Falls back to another pool candidate on provider failure statuses such as `400`, `429`, `500`, `502`, `503`, and `504`.
 - Switches to a compatible model before image prompts when the selected model does not support image input.
 - Exposes one tool, `model_router_config`, so the agent can help update config after confirmation.
 - Adds `/model-router` for a short status view or command-initiated weight setup.
@@ -29,7 +29,7 @@ pi install -l npm:pi-weighted-model-router
 To pin a specific version:
 
 ```bash
-pi install npm:pi-weighted-model-router@0.1.0
+pi install npm:pi-weighted-model-router@0.2.0
 ```
 
 From a local checkout:
@@ -70,7 +70,7 @@ Example config. Replace provider and model IDs with entries that exist in your p
   "strategy": "smooth-weighted-daily",
   "runtimeFallback": {
     "enabled": true,
-    "statuses": [429, 500, 502, 503, 504]
+    "statuses": [400, 429, 500, 502, 503, 504]
   },
   "pools": {
     "main": {
@@ -99,7 +99,7 @@ Example config. Replace provider and model IDs with entries that exist in your p
 }
 ```
 
-Provider and model IDs must exist in pi's model registry. If a model is registered but lacks credentials, the router skips it during selection. The sample values are placeholders, not endorsements or guarantees that a provider exposes a specific model name.
+Provider and model IDs must exist in pi's model registry. If a model is registered but lacks credentials, the router skips it during selection. Some providers can also return `400` when a registered model is temporarily unavailable, disabled for the account, or unsupported by the upstream backend; by default that response is treated as a runtime fallback signal. The sample values are placeholders, not endorsements or guarantees that a provider exposes a specific model name.
 
 ## Usage
 
