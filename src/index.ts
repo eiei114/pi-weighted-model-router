@@ -404,14 +404,17 @@ function parseSelectedModel(value: unknown): SelectedModel | undefined {
   };
 }
 
+/** Reads a trusted session_start reason from an event, defaulting older runtimes to startup. */
 function readSessionStartReason(event: { reason?: unknown }): SessionStartReason {
   return typeof event.reason === "string" && isSessionStartReason(event.reason) ? event.reason : "startup";
 }
 
+/** Converts pi session_start reasons into persisted selection reasons. */
 function sessionReasonToSelectionReason(reason: SessionStartReason): SelectedModel["reason"] {
   return reason === "startup" ? "initial" : reason;
 }
 
+/** Returns true when a persisted selection reason is supported by this router version. */
 function isSelectedReason(value: string): value is SelectedModel["reason"] {
   return (
     value === "initial" ||
