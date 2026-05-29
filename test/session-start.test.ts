@@ -1,0 +1,183 @@
+import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import weightedModelRouter from "../src/index.js";
+import { todayKey } from "../src/keys.js";
+import { successCounts } from "../src/ledger.js";
+import { readLedger, routerPaths, writeConfig } from "../src/storage.js";
+import type { ModelPoolEntry, RouterConfig, SelectedModel, SessionStartReason } from "../src/types.js";
+
+const SELECTION_ENTRY = "weighted-model-router-selection";
+
+test("session_start reload ignores stored entry and reselects", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+
+    assert.deepEqual(setModels, ["openai-codex/gpt-5.5"]);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].customType, SELECTION_ENTRY);
+    assert.equal(appended[0].data.reason, "reload");
+    assert.equal(appended[0].data.ledgerCommitted, false);
+  });
+});
+
+test("session_start resume restores stored entry", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended }) => {
+    await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
+
+    assert.deepEqual(setModels, ["stored/model"]);
+    assert.equal(appended.length, 0);
+  });
+});
+
+test("reselect abandons uncommitted old selection and commits only after first success", async () => {
+  await withHarness(async ({ handlers, ctx, paths, appended }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+
+    let ledger = await readLedger(paths.ledger);
+    assert.deepEqual(successCounts(ledger, todayKey(), "main"), {});
+    assert.equal(appended[0].data.ledgerCommitted, false);
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+
+    ledger = await readLedger(paths.ledger);
+    assert.deepEqual(successCounts(ledger, todayKey(), "main"), { "openai-codex/gpt-5.5": 1 });
+    assert.equal(appended.length, 2);
+    assert.equal(appended[1].data.ledgerCommitted, true);
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+    ledger = await readLedger(paths.ledger);
+    assert.deepEqual(successCounts(ledger, todayKey(), "main"), { "openai-codex/gpt-5.5": 1 });
+  });
+});
+
+async function withHarness(
+  run: (harness: Awaited<ReturnType<typeof createHarness>>) => Promise<void>,
+): Promise<void> {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-router-test-"));
+  try {
+    const harness = await createHarness(cwd);
+    await run(harness);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+}
+
+async function createHarness(cwd: string) {
+  await mkdir(join(cwd, ".pi"), { recursive: true });
+  await writeJson(join(cwd, ".pi", "settings.json"), { packages: ["pi-weighted-model-router"] });
+
+  const paths = routerPaths(join(cwd, ".pi"));
+  const entry: ModelPoolEntry = { provider: "openai-codex", model: "gpt-5.5", weight: 1 };
+  const config: RouterConfig = {
+    version: 1,
+    defaultPool: "main",
+    pools: { main: { entries: [entry] } },
+  };
+  await writeConfig(paths.config, config);
+
+  const storedSelection: SelectedModel = {
+    pool: "main",
+    provider: "stored",
+    model: "model",
+    key: "stored/model",
+    reason: "initial",
+    selectedAt: "2026-05-29T00:00:00.000Z",
+    attemptedKeys: ["stored/model"],
+    ledgerCommitted: false,
+  };
+
+  const sessionEntries: Array<{ type: string; customType: string; data: unknown }> = [
+    { type: "custom", customType: SELECTION_ENTRY, data: storedSelection },
+  ];
+  const setModels: string[] = [];
+  const appended: Array<{ customType: string; data: SelectedModel }> = [];
+  const handlers: Partial<Record<string, (event: any, ctx: any) => Promise<void> | void>> = {};
+
+  const models = [
+    { provider: "stored", id: "model", input: [] },
+    { provider: "openai-codex", id: "gpt-5.5", input: [] },
+  ];
+
+  const pi = {
+    on(event: string, handler: (event: any, ctx: any) => Promise<void> | void) {
+      handlers[event] = handler;
+    },
+    async setModel(model: { provider: string; id: string }) {
+      setModels.push(`${model.provider}/${model.id}`);
+      return true;
+    },
+    appendEntry(customType: string, data: SelectedModel) {
+      appended.push({ customType, data });
+      sessionEntries.push({ type: "custom", customType, data });
+    },
+    registerCommand() {},
+    registerTool() {},
+    sendUserMessage() {},
+  };
+
+  const ctx = {
+    cwd,
+    hasUI: false,
+    ui: {
+      notify() {},
+      setStatus() {},
+      async select() {
+        return undefined;
+      },
+      async confirm() {
+        return false;
+      },
+    },
+    sessionManager: {
+      getEntries() {
+        return [...sessionEntries];
+      },
+    },
+    modelRegistry: {
+      find(provider: string, model: string) {
+        return models.find((registered) => registered.provider === provider && registered.id === model);
+      },
+      getAll() {
+        return models;
+      },
+    },
+    model: undefined,
+    isIdle() {
+      return true;
+    },
+    signal: undefined,
+    abort() {},
+    hasPendingMessages() {
+      return false;
+    },
+    shutdown() {},
+    getContextUsage() {
+      return undefined;
+    },
+    compact() {},
+    getSystemPrompt() {
+      return "";
+    },
+  };
+
+  weightedModelRouter(pi as never);
+
+  return {
+    handlers: handlers as {
+      session_start: (event: { type: "session_start"; reason: SessionStartReason }, ctx: any) => Promise<void>;
+      after_provider_response: (event: { type: "after_provider_response"; status: number; headers: Record<string, string> }, ctx: any) => Promise<void>;
+    },
+    ctx,
+    paths,
+    setModels,
+    appended,
+  };
+}
+
+async function writeJson(path: string, value: unknown): Promise<void> {
+  const { writeFile } = await import("node:fs/promises");
+  await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}

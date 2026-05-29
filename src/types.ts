@@ -17,11 +17,18 @@ export interface RouterConfig {
   defaultPool: string;
   pools: Record<string, ModelPoolConfig>;
   strategy?: "smooth-weighted-daily";
+  sessionBoundary?: {
+    restoreOn?: SessionStartReason[];
+    reselectOn?: SessionStartReason[];
+  };
   runtimeFallback?: {
     enabled?: boolean;
     statuses?: number[];
   };
 }
+
+export type SessionStartReason = "startup" | "resume" | "new" | "reload" | "fork";
+export type SessionBoundaryAction = "restore" | "reselect";
 
 export interface PoolLedger {
   success: Record<string, number>;
@@ -47,7 +54,7 @@ export interface SelectedModel {
   provider: string;
   model: string;
   key: string;
-  reason: "initial" | "resume" | "fallback" | "capability";
+  reason: "initial" | "resume" | "fallback" | "capability" | "new" | "reload" | "fork";
   selectedAt: string;
   attemptedKeys: string[];
   ledgerCommitted: boolean;

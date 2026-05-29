@@ -1,5 +1,11 @@
-import { CONFIG_VERSION, type ModelPoolEntry, type RouterConfig } from "./types.js";
+import {
+  CONFIG_VERSION,
+  type ModelPoolEntry,
+  type RouterConfig,
+  type SessionStartReason,
+} from "./types.js";
 import { modelKey } from "./keys.js";
+import { DEFAULT_RESELECT_ON, DEFAULT_RESTORE_ON, isSessionStartReason } from "./session-boundary.js";
 
 export const DEFAULT_FALLBACK_STATUSES = [400, 429, 500, 502, 503, 504] as const;
 
@@ -8,6 +14,10 @@ export function defaultConfig(): RouterConfig {
     version: CONFIG_VERSION,
     defaultPool: "main",
     strategy: "smooth-weighted-daily",
+    sessionBoundary: {
+      restoreOn: [...DEFAULT_RESTORE_ON],
+      reselectOn: [...DEFAULT_RESELECT_ON],
+    },
     runtimeFallback: {
       enabled: true,
       statuses: [...DEFAULT_FALLBACK_STATUSES],
@@ -77,6 +87,22 @@ export function validateConfigShape(value: unknown): RouterConfig {
     strategy: value.strategy === "smooth-weighted-daily" ? value.strategy : "smooth-weighted-daily",
   };
 
+  if (isRecord(value.sessionBoundary)) {
+    const restoreOn = readSessionReasonList(value.sessionBoundary.restoreOn, "sessionBoundary.restoreOn");
+    const reselectOn = readSessionReasonList(value.sessionBoundary.reselectOn, "sessionBoundary.reselectOn");
+
+    const restoreValues = restoreOn ?? [...DEFAULT_RESTORE_ON];
+    const reselectValues = reselectOn ?? [...DEFAULT_RESELECT_ON];
+    const overlap = restoreValues.filter((reason) => reselectValues.includes(reason));
+    if (overlap.length > 0) {
+      throw new Error(`sessionBoundary restoreOn/reselectOn overlap: ${overlap.join(", ")}.`);
+    }
+
+    config.sessionBoundary = {};
+    if (restoreOn) config.sessionBoundary.restoreOn = restoreOn;
+    if (reselectOn) config.sessionBoundary.reselectOn = reselectOn;
+  }
+
   if (isRecord(value.runtimeFallback)) {
     config.runtimeFallback = {
       enabled: typeof value.runtimeFallback.enabled === "boolean" ? value.runtimeFallback.enabled : true,
@@ -112,4 +138,22 @@ function readIntegerStatus(value: unknown, label: string): number {
     throw new Error(`${label} must be an HTTP status code.`);
   }
   return value;
+}
+
+function readSessionReasonList(value: unknown, label: string): SessionStartReason[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array.`);
+
+  const reasons: SessionStartReason[] = [];
+  const seen = new Set<SessionStartReason>();
+  for (const [index, reason] of value.entries()) {
+    if (typeof reason !== "string" || !isSessionStartReason(reason)) {
+      throw new Error(`${label}[${index}] must be one of startup, resume, new, reload, fork.`);
+    }
+    if (!seen.has(reason)) {
+      seen.add(reason);
+      reasons.push(reason);
+    }
+  }
+  return reasons;
 }
