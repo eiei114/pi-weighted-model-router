@@ -29,6 +29,8 @@ export interface RouterConfig {
 
 export type SessionStartReason = "startup" | "resume" | "new" | "reload" | "fork";
 export type SessionBoundaryAction = "restore" | "reselect";
+export type SelectionReason = "initial" | "resume" | "fallback" | "capability" | "new" | "reload" | "fork" | "config";
+export type RouterBoundaryReason = SessionStartReason | SelectionReason;
 
 export interface PoolLedger {
   success: Record<string, number>;
@@ -54,7 +56,7 @@ export interface SelectedModel {
   provider: string;
   model: string;
   key: string;
-  reason: "initial" | "resume" | "fallback" | "capability" | "new" | "reload" | "fork";
+  reason: SelectionReason;
   selectedAt: string;
   attemptedKeys: string[];
   ledgerCommitted: boolean;
@@ -84,6 +86,8 @@ export interface StatusSnapshot {
   configPath: string;
   pool: string | undefined;
   selected: SelectedModel | undefined;
+  boundaryReason?: RouterBoundaryReason;
+  previousModel?: SelectedModel;
   today: string;
   counts: Record<string, number>;
 }

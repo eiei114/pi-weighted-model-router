@@ -12,7 +12,16 @@ import { formatUnknownModelMessage } from "./model-suggestions.js";
 import { rankDailyBalanced, withoutAttempted } from "./selector.js";
 import { isSessionStartReason, resolveSessionBoundaryAction } from "./session-boundary.js";
 import { readConfig, readLedger, readState, routerPaths, writeConfig, writeLedger, writeState } from "./storage.js";
-import type { ModelPoolEntry, RouterConfig, RouterLedger, RouterPaths, SelectedModel, SessionStartReason, StatusSnapshot } from "./types.js";
+import type {
+  ModelPoolEntry,
+  RouterBoundaryReason,
+  RouterConfig,
+  RouterLedger,
+  RouterPaths,
+  SelectedModel,
+  SessionStartReason,
+  StatusSnapshot,
+} from "./types.js";
 
 const SELECTION_ENTRY = "weighted-model-router-selection";
 const STATUS_KEY = "model-router";
@@ -23,6 +32,8 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
   let config: RouterConfig | undefined;
   let ledger: RouterLedger | undefined;
   let selected: SelectedModel | undefined;
+  let previousModel: SelectedModel | undefined;
+  let boundaryReason: RouterBoundaryReason | undefined;
   let requiredInputs: string[] = [];
 
   function syncPaths(ctx: ExtensionContext): void {
@@ -92,13 +103,20 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       return;
     }
 
-    ctx.ui.setStatus(STATUS_KEY, `router:${selected.pool} ${selected.provider}/${selected.model}`);
+    const reason = boundaryReason ?? selected.reason;
+    ctx.ui.setStatus(STATUS_KEY, `router:${selected.pool} ${formatModelName(selected)} [${reason}]`);
   }
 
   async function chooseAndSetModel(
     ctx: ExtensionContext,
     reason: SelectedModel["reason"],
-    options: { excludeKeys?: string[]; preserveLedgerCommit?: boolean; inputs?: string[] } = {},
+    options: {
+      excludeKeys?: string[];
+      preserveLedgerCommit?: boolean;
+      inputs?: string[];
+      previousModel?: SelectedModel;
+      notifyReselect?: boolean;
+    } = {},
   ): Promise<SelectedModel | undefined> {
     if (!(await ensureRuntime(ctx)) || !config || !ledger) return undefined;
 
@@ -111,6 +129,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
     const inputs = options.inputs ?? requiredInputs;
     const excludeKeys = options.excludeKeys ?? [];
+    const priorSelection = options.previousModel ?? selected;
     const candidates = withoutAttempted(filterRegisteredAndCapable(ctx, pool.entries, inputs), excludeKeys);
     const ranked = rankDailyBalanced({
       poolName,
@@ -138,8 +157,11 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
         attemptedKeys,
         ledgerCommitted,
       };
+      previousModel = priorSelection;
+      boundaryReason = reason;
       pi.appendEntry(SELECTION_ENTRY, selected);
       updateStatus(ctx);
+      if (options.notifyReselect) notifyReselect(ctx, reason, priorSelection, selected);
       return selected;
     }
 
@@ -186,19 +208,24 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       configPath: paths.config,
       pool,
       selected,
+      boundaryReason,
+      previousModel,
       today: todayKey(),
       counts: ledger && pool ? successCounts(ledger, todayKey(), pool) : {},
     };
   }
 
   function formatStatus(snapshot: StatusSnapshot): string {
-    const model = snapshot.selected ? `${snapshot.selected.provider}/${snapshot.selected.model}` : "(none)";
+    const model = snapshot.selected ? formatModelName(snapshot.selected) : "(none)";
+    const previous = snapshot.previousModel ? formatModelName(snapshot.previousModel) : "(none)";
     const counts = Object.entries(snapshot.counts)
       .map(([key, count]) => `${key}=${count}`)
       .join(", ");
     return [
       `pool: ${snapshot.pool ?? "(none)"}`,
       `model: ${model}`,
+      `boundary: ${snapshot.boundaryReason ?? "(none)"}`,
+      `previous: ${previous}`,
       `today: ${snapshot.today}`,
       `counts: ${counts || "(none)"}`,
       `config: ${snapshot.configPath}`,
@@ -213,8 +240,11 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     const action = resolveSessionBoundaryAction(reason, config);
 
     if (action === "reselect") {
-      selected = undefined;
-      await chooseAndSetModel(ctx, sessionReasonToSelectionReason(reason));
+      const previous = selected ?? restoreSelection(ctx);
+      await chooseAndSetModel(ctx, sessionReasonToSelectionReason(reason), {
+        previousModel: previous,
+        notifyReselect: true,
+      });
       return;
     }
 
@@ -223,12 +253,21 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       const model = ctx.modelRegistry.find(restored.provider, restored.model);
       if (model && (await pi.setModel(model))) {
         selected = restored;
+        boundaryReason = reason;
         updateStatus(ctx);
         return;
       }
     }
 
     await chooseAndSetModel(ctx, "initial");
+  });
+
+  pi.on("session_shutdown", (_event, ctx) => {
+    selected = undefined;
+    previousModel = undefined;
+    boundaryReason = undefined;
+    requiredInputs = [];
+    updateStatus(ctx);
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
@@ -335,11 +374,25 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
       await writeConfig(paths.config, nextConfig);
       config = nextConfig;
-      selected = undefined;
-      await chooseAndSetModel(ctx, "initial");
+      const previous = selected;
+      await chooseAndSetModel(ctx, "config", { previousModel: previous, notifyReselect: Boolean(previous) });
       return textResult("Config saved.", { configPath: paths.config });
     },
   });
+}
+
+function notifyReselect(
+  ctx: ExtensionContext,
+  reason: SelectedModel["reason"],
+  previous: SelectedModel | undefined,
+  current: SelectedModel,
+): void {
+  const was = previous ? formatModelName(previous) : "(none)";
+  ctx.ui.notify(`Model router: ${reason} \u2192 ${formatModelName(current)} (was ${was})`, "info");
+}
+
+function formatModelName(model: Pick<SelectedModel, "provider" | "model">): string {
+  return `${model.provider}/${model.model}`;
 }
 
 function validateRegisteredModels(ctx: ExtensionContext, nextConfig: RouterConfig): void {
@@ -423,7 +476,8 @@ function isSelectedReason(value: string): value is SelectedModel["reason"] {
     value === "capability" ||
     value === "new" ||
     value === "reload" ||
-    value === "fork"
+    value === "fork" ||
+    value === "config"
   );
 }
 

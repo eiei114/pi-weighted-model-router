@@ -107,6 +107,10 @@ Provider and model IDs must exist in pi's model registry. If a model is register
 
 `sessionBoundary` is optional. Defaults restore the saved model for `startup` and `resume`, but reselect on `new`, `reload`, and `fork` even when the previous session contains a saved router selection.
 
+## Manual Model Changes
+
+Manual model selection through pi (for example `/model` or the Ctrl+P model picker) is outside the router's control. The manual choice remains active until the next router boundary that reselects a model, such as `new`, `reload`, `fork`, or a confirmed config save.
+
 ## Usage
 
 Start guided setup from the command:
