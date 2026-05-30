@@ -215,6 +215,13 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     };
   }
 
+  /**
+   * Performs a manual session-boundary reselection without replacing the session.
+   *
+   * The previous selection is excluded so `/model-router next` moves to a different
+   * usable pool entry when one is available; ledger usage is still deferred until
+   * the first successful provider response commits the new selection.
+   */
   async function reselectNext(ctx: ExtensionContext): Promise<void> {
     const previous = selected ?? restoreSelection(ctx);
     await chooseAndSetModel(ctx, "next", {
