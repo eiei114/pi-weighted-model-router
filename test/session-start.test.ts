@@ -11,6 +11,16 @@ import type { ModelPoolEntry, RouterConfig, SelectedModel, SessionStartReason } 
 
 const SELECTION_ENTRY = "weighted-model-router-selection";
 
+test("session_start startup restores stored entry", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
+
+    assert.deepEqual(setModels, ["stored/model"]);
+    assert.equal(appended.length, 0);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main stored/model [startup]" });
+  });
+});
+
 test("session_start reload ignores stored entry and reselects", async () => {
   await withHarness(async ({ handlers, ctx, setModels, appended, notifications, statuses }) => {
     await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
@@ -22,6 +32,90 @@ test("session_start reload ignores stored entry and reselects", async () => {
     assert.equal(appended[0].data.ledgerCommitted, false);
     assert.deepEqual(notifications, ["Model router: reload \u2192 openai-codex/gpt-5.5 (was stored/model)"]);
     assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main openai-codex/gpt-5.5 [reload]" });
+  });
+});
+
+test("session_start fork treats copied parent selection as a boundary and reselects", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, notifications, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "fork" }, ctx);
+
+    assert.deepEqual(setModels, ["openai-codex/gpt-5.5"]);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "fork");
+    assert.notEqual(appended[0].data.key, "stored/model");
+    assert.deepEqual(notifications, ["Model router: fork → openai-codex/gpt-5.5 (was stored/model)"]);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main openai-codex/gpt-5.5 [fork]" });
+  });
+});
+
+test("session_start new without a stored entry selects and records a fresh model", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, notifications, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "new" }, ctx);
+
+    assert.deepEqual(setModels, ["openai-codex/gpt-5.5"]);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].customType, SELECTION_ENTRY);
+    assert.equal(appended[0].data.reason, "new");
+    assert.deepEqual(notifications, ["Model router: new → openai-codex/gpt-5.5 (was (none))"]);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main openai-codex/gpt-5.5 [new]" });
+  }, { includeStoredSelection: false });
+});
+
+test("consecutive new sessions converge to configured selector weights", async () => {
+  const weightedEntries: ModelPoolEntry[] = [
+    { provider: "openai-codex", model: "gpt-5.5", weight: 7 },
+    { provider: "cursor", model: "gpt-5.5", weight: 2 },
+    { provider: "fallback", model: "gpt-5.5", weight: 1 },
+  ];
+
+  await withHarness(async ({ handlers, ctx, ledgerCounts }) => {
+    for (let index = 0; index < 10; index += 1) {
+      await handlers.session_start({ type: "session_start", reason: "new" }, ctx);
+      await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+      await handlers.session_shutdown({ type: "session_shutdown" }, ctx);
+    }
+
+    assert.deepEqual(await ledgerCounts(), {
+      "openai-codex/gpt-5.5": 7,
+      "cursor/gpt-5.5": 2,
+      "fallback/gpt-5.5": 1,
+    });
+  }, { includeStoredSelection: false, entries: weightedEntries });
+});
+
+test("session boundary config override can restore reload from stored entry", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+
+    assert.deepEqual(setModels, ["stored/model"]);
+    assert.equal(appended.length, 0);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main stored/model [reload]" });
+  }, {
+    configPatch: {
+      sessionBoundary: {
+        restoreOn: ["startup", "resume", "reload"],
+        reselectOn: ["new", "fork"],
+      },
+    },
+  });
+});
+
+test("session boundary config override can reselect resume despite stored entry", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, notifications, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
+
+    assert.deepEqual(setModels, ["openai-codex/gpt-5.5"]);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "resume");
+    assert.deepEqual(notifications, ["Model router: resume → openai-codex/gpt-5.5 (was stored/model)"]);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main openai-codex/gpt-5.5 [resume]" });
+  }, {
+    configPatch: {
+      sessionBoundary: {
+        restoreOn: ["startup"],
+        reselectOn: ["resume", "new", "reload", "fork"],
+      },
+    },
   });
 });
 
@@ -81,6 +175,30 @@ test("reselect abandons uncommitted old selection and commits only after first s
     await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
     ledger = await readLedger(paths.ledger);
     assert.deepEqual(successCounts(ledger, todayKey(), "main"), { "openai-codex/gpt-5.5": 1 });
+  });
+});
+
+test("committed selection can be reselected and counted again after first success", async () => {
+  await withHarness(async ({ handlers, ctx, appended, ledgerCounts }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+
+    const before = await ledgerCounts();
+    const previousAppendCount = appended.length;
+
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    const reselected = appended.at(-1)?.data;
+    assert.ok(reselected);
+    assert.equal(reselected.reason, "reload");
+    assert.equal(reselected.ledgerCommitted, false);
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+
+    const after = await ledgerCounts();
+    assert.equal(after[reselected.key], (before[reselected.key] ?? 0) + 1);
+    assert.equal(appended.length, previousAppendCount + 2);
+    assert.equal(appended.at(-1)?.data.key, reselected.key);
+    assert.equal(appended.at(-1)?.data.ledgerCommitted, true);
   });
 });
 
@@ -163,17 +281,24 @@ test("model-router menu can trigger next reselect", async () => {
 
 async function withHarness(
   run: (harness: Awaited<ReturnType<typeof createHarness>>) => Promise<void>,
+  options: HarnessOptions = {},
 ): Promise<void> {
   const cwd = await mkdtemp(join(tmpdir(), "pi-router-test-"));
   try {
-    const harness = await createHarness(cwd);
+    const harness = await createHarness(cwd, options);
     await run(harness);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
 }
 
-async function createHarness(cwd: string) {
+interface HarnessOptions {
+  includeStoredSelection?: boolean;
+  entries?: ModelPoolEntry[];
+  configPatch?: Partial<RouterConfig>;
+}
+
+async function createHarness(cwd: string, options: HarnessOptions = {}) {
   await mkdir(join(cwd, ".pi"), { recursive: true });
   await writeJson(join(cwd, ".pi", "settings.json"), { packages: ["pi-weighted-model-router"] });
 
@@ -183,7 +308,8 @@ async function createHarness(cwd: string) {
   const config: RouterConfig = {
     version: 1,
     defaultPool: "main",
-    pools: { main: { entries: [entry, nextEntry] } },
+    pools: { main: { entries: options.entries ?? [entry, nextEntry] } },
+    ...options.configPatch,
   };
   await writeConfig(paths.config, config);
 
@@ -198,9 +324,8 @@ async function createHarness(cwd: string) {
     ledgerCommitted: false,
   };
 
-  const sessionEntries: Array<{ type: string; customType: string; data: unknown }> = [
-    { type: "custom", customType: SELECTION_ENTRY, data: storedSelection },
-  ];
+  const sessionEntries: Array<{ type: string; customType: string; data: unknown }> =
+    options.includeStoredSelection === false ? [] : [{ type: "custom", customType: SELECTION_ENTRY, data: storedSelection }];
   const setModels: string[] = [];
   const appended: Array<{ customType: string; data: SelectedModel }> = [];
   const handlers: Partial<Record<string, (event: any, ctx: any) => Promise<void> | void>> = {};
@@ -215,6 +340,7 @@ async function createHarness(cwd: string) {
     { provider: "stored", id: "model", input: [] },
     { provider: "openai-codex", id: "gpt-5.5", input: [] },
     { provider: "cursor", id: "gpt-5.5", input: [] },
+    { provider: "fallback", id: "gpt-5.5", input: [] },
   ];
 
   const pi = {
