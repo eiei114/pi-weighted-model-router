@@ -238,11 +238,9 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
     const reason = readSessionStartReason(event);
     const action = resolveSessionBoundaryAction(reason, config);
-    boundaryReason = reason;
 
     if (action === "reselect") {
       const previous = selected ?? restoreSelection(ctx);
-      selected = undefined;
       await chooseAndSetModel(ctx, sessionReasonToSelectionReason(reason), {
         previousModel: previous,
         notifyReselect: true,
@@ -255,6 +253,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       const model = ctx.modelRegistry.find(restored.provider, restored.model);
       if (model && (await pi.setModel(model))) {
         selected = restored;
+        boundaryReason = reason;
         updateStatus(ctx);
         return;
       }
@@ -376,7 +375,6 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       await writeConfig(paths.config, nextConfig);
       config = nextConfig;
       const previous = selected;
-      selected = undefined;
       await chooseAndSetModel(ctx, "config", { previousModel: previous, notifyReselect: Boolean(previous) });
       return textResult("Config saved.", { configPath: paths.config });
     },

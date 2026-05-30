@@ -38,11 +38,28 @@ test("status includes boundary reason and previous model", async () => {
 });
 
 test("session_start resume restores stored entry", async () => {
-  await withHarness(async ({ handlers, ctx, setModels, appended }) => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, statuses }) => {
     await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
 
     assert.deepEqual(setModels, ["stored/model"]);
     assert.equal(appended.length, 0);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main stored/model [resume]" });
+  });
+});
+
+test("reselect failure preserves current selection and status", async () => {
+  await withHarness(async ({ handlers, tools, ctx, controls, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
+    controls.setModelSuccess = false;
+
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main stored/model [resume]" });
+
+    const result = await tools.model_router_config.execute("tool-call", { action: "status" }, undefined, undefined, ctx);
+    const status = result.content[0].text;
+    assert.match(status, /^model: stored\/model$/m);
+    assert.match(status, /^boundary: resume$/m);
   });
 });
 
@@ -147,6 +164,7 @@ async function createHarness(cwd: string) {
   const tools: Record<string, any> = {};
   const notifications: string[] = [];
   const statuses: Array<{ key: string; value: string | undefined }> = [];
+  const controls = { setModelSuccess: true };
 
   const models = [
     { provider: "stored", id: "model", input: [] },
@@ -159,7 +177,7 @@ async function createHarness(cwd: string) {
     },
     async setModel(model: { provider: string; id: string }) {
       setModels.push(`${model.provider}/${model.id}`);
-      return true;
+      return controls.setModelSuccess;
     },
     appendEntry(customType: string, data: SelectedModel) {
       appended.push({ customType, data });
@@ -237,6 +255,7 @@ async function createHarness(cwd: string) {
     tools,
     notifications,
     statuses,
+    controls,
   };
 }
 
