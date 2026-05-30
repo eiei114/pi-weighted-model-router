@@ -119,6 +119,48 @@ test("config save reselects with config reason", async () => {
   });
 });
 
+test("model-router next reselects without session reload and commits after success", async () => {
+  await withHarness(async ({ handlers, commands, ctx, appended, notifications, statuses, ledgerCounts, sessionActions }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    appended.length = 0;
+    notifications.length = 0;
+
+    await commands["model-router"].handler("next", ctx);
+
+    assert.deepEqual(sessionActions, []);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "next");
+    assert.equal(appended[0].data.provider, "cursor");
+    assert.equal(appended[0].data.ledgerCommitted, false);
+    assert.deepEqual(await ledgerCounts(), {});
+    assert.deepEqual(notifications, ["Model router: next \u2192 cursor/gpt-5.5 (was openai-codex/gpt-5.5)"]);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main cursor/gpt-5.5 [next]" });
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+
+    assert.deepEqual(await ledgerCounts(), { "cursor/gpt-5.5": 1 });
+    assert.equal(appended.length, 2);
+    assert.equal(appended[1].data.reason, "next");
+    assert.equal(appended[1].data.ledgerCommitted, true);
+  });
+});
+
+test("model-router menu can trigger next reselect", async () => {
+  await withHarness(async ({ handlers, commands, ctx, appended, controls }) => {
+    ctx.hasUI = true;
+    controls.selectChoice = "Next model";
+
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    appended.length = 0;
+
+    await commands["model-router"].handler("", ctx);
+
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "next");
+    assert.equal(appended[0].data.provider, "cursor");
+  });
+});
+
 async function withHarness(
   run: (harness: Awaited<ReturnType<typeof createHarness>>) => Promise<void>,
 ): Promise<void> {
@@ -136,11 +178,12 @@ async function createHarness(cwd: string) {
   await writeJson(join(cwd, ".pi", "settings.json"), { packages: ["pi-weighted-model-router"] });
 
   const paths = routerPaths(join(cwd, ".pi"));
-  const entry: ModelPoolEntry = { provider: "openai-codex", model: "gpt-5.5", weight: 1 };
+  const entry: ModelPoolEntry = { provider: "openai-codex", model: "gpt-5.5", weight: 1_000_000 };
+  const nextEntry: ModelPoolEntry = { provider: "cursor", model: "gpt-5.5", weight: 1 };
   const config: RouterConfig = {
     version: 1,
     defaultPool: "main",
-    pools: { main: { entries: [entry] } },
+    pools: { main: { entries: [entry, nextEntry] } },
   };
   await writeConfig(paths.config, config);
 
@@ -162,13 +205,16 @@ async function createHarness(cwd: string) {
   const appended: Array<{ customType: string; data: SelectedModel }> = [];
   const handlers: Partial<Record<string, (event: any, ctx: any) => Promise<void> | void>> = {};
   const tools: Record<string, any> = {};
+  const commands: Record<string, any> = {};
   const notifications: string[] = [];
   const statuses: Array<{ key: string; value: string | undefined }> = [];
-  const controls = { setModelSuccess: true };
+  const controls = { setModelSuccess: true, selectChoice: undefined as string | undefined };
+  const sessionActions: string[] = [];
 
   const models = [
     { provider: "stored", id: "model", input: [] },
     { provider: "openai-codex", id: "gpt-5.5", input: [] },
+    { provider: "cursor", id: "gpt-5.5", input: [] },
   ];
 
   const pi = {
@@ -183,7 +229,9 @@ async function createHarness(cwd: string) {
       appended.push({ customType, data });
       sessionEntries.push({ type: "custom", customType, data });
     },
-    registerCommand() {},
+    registerCommand(name: string, command: any) {
+      commands[name] = command;
+    },
     registerTool(tool: { name: string }) {
       tools[tool.name] = tool;
     },
@@ -201,7 +249,7 @@ async function createHarness(cwd: string) {
         statuses.push({ key, value });
       },
       async select() {
-        return undefined;
+        return controls.selectChoice;
       },
       async confirm() {
         return true;
@@ -234,6 +282,13 @@ async function createHarness(cwd: string) {
       return undefined;
     },
     compact() {},
+    async newSession() {
+      sessionActions.push("newSession");
+      return { cancelled: false };
+    },
+    async reload() {
+      sessionActions.push("reload");
+    },
     getSystemPrompt() {
       return "";
     },
@@ -253,9 +308,15 @@ async function createHarness(cwd: string) {
     setModels,
     appended,
     tools,
+    commands,
     notifications,
     statuses,
     controls,
+    sessionActions,
+    async ledgerCounts() {
+      const ledger = await readLedger(paths.ledger);
+      return successCounts(ledger, todayKey(), "main");
+    },
   };
 }
 

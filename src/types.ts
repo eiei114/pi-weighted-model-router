@@ -29,7 +29,16 @@ export interface RouterConfig {
 
 export type SessionStartReason = "startup" | "resume" | "new" | "reload" | "fork";
 export type SessionBoundaryAction = "restore" | "reselect";
-export type SelectionReason = "initial" | "resume" | "fallback" | "capability" | "new" | "reload" | "fork" | "config";
+export type SelectionReason =
+  | "initial"
+  | "resume"
+  | "fallback"
+  | "capability"
+  | "new"
+  | "reload"
+  | "fork"
+  | "config"
+  | "next";
 export type RouterBoundaryReason = SessionStartReason | SelectionReason;
 
 export interface PoolLedger {
