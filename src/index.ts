@@ -215,6 +215,22 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     };
   }
 
+  /**
+   * Performs a manual session-boundary reselection without replacing the session.
+   *
+   * The previous selection is excluded so `/model-router next` moves to a different
+   * usable pool entry when one is available; ledger usage is still deferred until
+   * the first successful provider response commits the new selection.
+   */
+  async function reselectNext(ctx: ExtensionContext): Promise<void> {
+    const previous = selected ?? restoreSelection(ctx);
+    await chooseAndSetModel(ctx, "next", {
+      excludeKeys: previous ? [previous.key] : undefined,
+      previousModel: previous,
+      notifyReselect: true,
+    });
+  }
+
   function formatStatus(snapshot: StatusSnapshot): string {
     const model = snapshot.selected ? formatModelName(snapshot.selected) : "(none)";
     const previous = snapshot.previousModel ? formatModelName(snapshot.previousModel) : "(none)";
@@ -308,8 +324,25 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("model-router", {
-    description: "Show weighted model router status or start guided weight setup",
-    handler: async (_args, ctx) => {
+    description: "Show weighted model router status, reselect the next model, or start guided weight setup",
+    getArgumentCompletions: (argumentPrefix) => {
+      const commands = ["next"];
+      return commands
+        .filter((command) => command.startsWith(argumentPrefix.trim()))
+        .map((command) => ({ value: command, label: command }));
+    },
+    handler: async (args, ctx) => {
+      const subcommand = args.trim();
+      if (subcommand === "next") {
+        await reselectNext(ctx);
+        return;
+      }
+
+      if (subcommand) {
+        ctx.ui.notify(`Unknown model-router command: ${subcommand}`, "warning");
+        return;
+      }
+
       await ensureRuntime(ctx);
       const status = formatStatus(createStatusSnapshot());
 
@@ -320,8 +353,14 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
       const choice = await ctx.ui.select("Model Router", [
         "Show status",
+        "Next model",
         "Configure model weights",
       ]);
+
+      if (choice === "Next model") {
+        await reselectNext(ctx);
+        return;
+      }
 
       if (choice === "Configure model weights") {
         pi.sendUserMessage(buildWeightSetupPrompt(config, status));
@@ -477,7 +516,8 @@ function isSelectedReason(value: string): value is SelectedModel["reason"] {
     value === "new" ||
     value === "reload" ||
     value === "fork" ||
-    value === "config"
+    value === "config" ||
+    value === "next"
   );
 }
 

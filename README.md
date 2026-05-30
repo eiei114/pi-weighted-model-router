@@ -137,6 +137,14 @@ Show current status from the same command:
 
 Choose `Show status`. Status includes current pool, current model, today's success counts, and config path.
 
+Reselect a model at the current session boundary without starting a new session or reloading:
+
+```text
+/model-router next
+```
+
+You can also choose `Next model` from `/model-router`. The conversation history stays in the same session; the router appends a new `weighted-model-router-selection` entry with reason `next` and commits ledger usage only after the first successful provider response.
+
 ## Privacy
 
 The README uses placeholder provider and model IDs. Do not publish local config files, API keys, account identifiers, or provider-specific contract details.
