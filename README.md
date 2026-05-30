@@ -72,6 +72,10 @@ Example config. Replace provider and model IDs with entries that exist in your p
     "enabled": true,
     "statuses": [400, 429, 500, 502, 503, 504]
   },
+  "sessionBoundary": {
+    "restoreOn": ["startup", "resume"],
+    "reselectOn": ["new", "reload", "fork"]
+  },
   "pools": {
     "main": {
       "entries": [
@@ -100,6 +104,8 @@ Example config. Replace provider and model IDs with entries that exist in your p
 ```
 
 Provider and model IDs must exist in pi's model registry. If a model is registered but lacks credentials, the router skips it during selection. Some providers can also return `400` when a registered model is temporarily unavailable, disabled for the account, or unsupported by the upstream backend; by default that response is treated as a runtime fallback signal. The sample values are placeholders, not endorsements or guarantees that a provider exposes a specific model name.
+
+`sessionBoundary` is optional. Defaults restore the saved model for `startup` and `resume`, but reselect on `new`, `reload`, and `fork` even when the previous session contains a saved router selection.
 
 ## Usage
 

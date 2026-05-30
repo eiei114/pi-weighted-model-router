@@ -1,13 +1,24 @@
-import { CONFIG_VERSION, type ModelPoolEntry, type RouterConfig } from "./types.js";
+import {
+  CONFIG_VERSION,
+  type ModelPoolEntry,
+  type RouterConfig,
+  type SessionStartReason,
+} from "./types.js";
 import { modelKey } from "./keys.js";
+import { DEFAULT_RESELECT_ON, DEFAULT_RESTORE_ON, isSessionStartReason } from "./session-boundary.js";
 
 export const DEFAULT_FALLBACK_STATUSES = [400, 429, 500, 502, 503, 504] as const;
 
+/** Builds the default weighted-router configuration, including the default session boundary policy. */
 export function defaultConfig(): RouterConfig {
   return {
     version: CONFIG_VERSION,
     defaultPool: "main",
     strategy: "smooth-weighted-daily",
+    sessionBoundary: {
+      restoreOn: [...DEFAULT_RESTORE_ON],
+      reselectOn: [...DEFAULT_RESELECT_ON],
+    },
     runtimeFallback: {
       enabled: true,
       statuses: [...DEFAULT_FALLBACK_STATUSES],
@@ -24,15 +35,18 @@ export function defaultConfig(): RouterConfig {
   };
 }
 
+/** Returns the HTTP statuses that trigger runtime fallback for the given config. */
 export function fallbackStatuses(config: RouterConfig): Set<number> {
   const configured = config.runtimeFallback?.statuses;
   return new Set(configured && configured.length > 0 ? configured : DEFAULT_FALLBACK_STATUSES);
 }
 
+/** Returns whether provider-response fallback is enabled for the given config. */
 export function runtimeFallbackEnabled(config: RouterConfig): boolean {
   return config.runtimeFallback?.enabled ?? true;
 }
 
+/** Parses and validates a router config loaded from JSON-compatible data. */
 export function validateConfigShape(value: unknown): RouterConfig {
   if (!isRecord(value)) throw new Error("Config must be an object.");
   if (value.version !== CONFIG_VERSION) {
@@ -77,6 +91,22 @@ export function validateConfigShape(value: unknown): RouterConfig {
     strategy: value.strategy === "smooth-weighted-daily" ? value.strategy : "smooth-weighted-daily",
   };
 
+  if (isRecord(value.sessionBoundary)) {
+    const restoreOn = readSessionReasonList(value.sessionBoundary.restoreOn, "sessionBoundary.restoreOn");
+    const reselectOn = readSessionReasonList(value.sessionBoundary.reselectOn, "sessionBoundary.reselectOn");
+
+    const restoreValues = restoreOn ?? [...DEFAULT_RESTORE_ON];
+    const reselectValues = reselectOn ?? [...DEFAULT_RESELECT_ON];
+    const overlap = restoreValues.filter((reason) => reselectValues.includes(reason));
+    if (overlap.length > 0) {
+      throw new Error(`sessionBoundary restoreOn/reselectOn overlap: ${overlap.join(", ")}.`);
+    }
+
+    config.sessionBoundary = {};
+    if (restoreOn) config.sessionBoundary.restoreOn = restoreOn;
+    if (reselectOn) config.sessionBoundary.reselectOn = reselectOn;
+  }
+
   if (isRecord(value.runtimeFallback)) {
     config.runtimeFallback = {
       enabled: typeof value.runtimeFallback.enabled === "boolean" ? value.runtimeFallback.enabled : true,
@@ -91,15 +121,18 @@ export function validateConfigShape(value: unknown): RouterConfig {
   return config;
 }
 
+/** Returns true when a value can be safely inspected as a plain object record. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Reads a required, non-empty string field from untrusted config input. */
 function readNonEmptyString(value: unknown, label: string): string {
   if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} must be a non-empty string.`);
   return value;
 }
 
+/** Reads a required positive numeric weight from untrusted config input. */
 function readPositiveNumber(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
     throw new Error(`${label} must be a positive number.`);
@@ -107,9 +140,29 @@ function readPositiveNumber(value: unknown, label: string): number {
   return value;
 }
 
+/** Reads a valid HTTP status code from untrusted config input. */
 function readIntegerStatus(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 100 || value > 599) {
     throw new Error(`${label} must be an HTTP status code.`);
   }
   return value;
+}
+
+/** Reads an optional, de-duplicated list of session start reasons from untrusted config input. */
+function readSessionReasonList(value: unknown, label: string): SessionStartReason[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array.`);
+
+  const reasons: SessionStartReason[] = [];
+  const seen = new Set<SessionStartReason>();
+  for (const [index, reason] of value.entries()) {
+    if (typeof reason !== "string" || !isSessionStartReason(reason)) {
+      throw new Error(`${label}[${index}] must be one of startup, resume, new, reload, fork.`);
+    }
+    if (!seen.has(reason)) {
+      seen.add(reason);
+      reasons.push(reason);
+    }
+  }
+  return reasons;
 }

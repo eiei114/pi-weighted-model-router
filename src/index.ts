@@ -10,8 +10,9 @@ import { modelKey, todayKey } from "./keys.js";
 import { recordSuccess, successCounts } from "./ledger.js";
 import { formatUnknownModelMessage } from "./model-suggestions.js";
 import { rankDailyBalanced, withoutAttempted } from "./selector.js";
+import { isSessionStartReason, resolveSessionBoundaryAction } from "./session-boundary.js";
 import { readConfig, readLedger, readState, routerPaths, writeConfig, writeLedger, writeState } from "./storage.js";
-import type { ModelPoolEntry, RouterConfig, RouterLedger, RouterPaths, SelectedModel, StatusSnapshot } from "./types.js";
+import type { ModelPoolEntry, RouterConfig, RouterLedger, RouterPaths, SelectedModel, SessionStartReason, StatusSnapshot } from "./types.js";
 
 const SELECTION_ENTRY = "weighted-model-router-selection";
 const STATUS_KEY = "model-router";
@@ -126,7 +127,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       if (!success) continue;
 
       const attemptedKeys = [...new Set([...excludeKeys, candidate.key])];
-      const ledgerCommitted = await commitLedgerForSelection(candidate.key, poolName, options.preserveLedgerCommit ?? false);
+      const ledgerCommitted = options.preserveLedgerCommit ?? false;
       selected = {
         pool: poolName,
         provider: candidate.entry.provider,
@@ -144,14 +145,6 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
     ctx.ui.notify("Model router found no usable model in the selected pool.", "warning");
     return undefined;
-  }
-
-  async function commitLedgerForSelection(key: string, poolName: string, alreadyCommitted: boolean): Promise<boolean> {
-    if (alreadyCommitted || !ledger) return alreadyCommitted;
-
-    ledger = recordSuccess(ledger, todayKey(), poolName, key);
-    await writeLedger(paths.ledger, ledger);
-    return true;
   }
 
   function filterRegisteredAndCapable(ctx: ExtensionContext, entries: ModelPoolEntry[], inputs: string[]): ModelPoolEntry[] {
@@ -212,15 +205,24 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     ].join("\n");
   }
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
     await loadConfig(ctx);
     await loadLedger();
+
+    const reason = readSessionStartReason(event);
+    const action = resolveSessionBoundaryAction(reason, config);
+
+    if (action === "reselect") {
+      selected = undefined;
+      await chooseAndSetModel(ctx, sessionReasonToSelectionReason(reason));
+      return;
+    }
 
     const restored = restoreSelection(ctx);
     if (restored) {
       const model = ctx.modelRegistry.find(restored.provider, restored.model);
       if (model && (await pi.setModel(model))) {
-        selected = { ...restored, reason: "resume" };
+        selected = restored;
         updateStatus(ctx);
         return;
       }
@@ -402,8 +404,27 @@ function parseSelectedModel(value: unknown): SelectedModel | undefined {
   };
 }
 
+/** Reads a trusted session_start reason from an event, defaulting older runtimes to startup. */
+function readSessionStartReason(event: { reason?: unknown }): SessionStartReason {
+  return typeof event.reason === "string" && isSessionStartReason(event.reason) ? event.reason : "startup";
+}
+
+/** Converts pi session_start reasons into persisted selection reasons. */
+function sessionReasonToSelectionReason(reason: SessionStartReason): SelectedModel["reason"] {
+  return reason === "startup" ? "initial" : reason;
+}
+
+/** Returns true when a persisted selection reason is supported by this router version. */
 function isSelectedReason(value: string): value is SelectedModel["reason"] {
-  return value === "initial" || value === "resume" || value === "fallback" || value === "capability";
+  return (
+    value === "initial" ||
+    value === "resume" ||
+    value === "fallback" ||
+    value === "capability" ||
+    value === "new" ||
+    value === "reload" ||
+    value === "fork"
+  );
 }
 
 function textResult(text: string, details: Record<string, unknown> = {}) {
