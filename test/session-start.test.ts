@@ -279,6 +279,10 @@ test("model-router menu can trigger next reselect", async () => {
   });
 });
 
+/**
+ * Creates an isolated temporary project, installs the mocked router extension,
+ * and removes all project-local state after the supplied assertions complete.
+ */
 async function withHarness(
   run: (harness: Awaited<ReturnType<typeof createHarness>>) => Promise<void>,
   options: HarnessOptions = {},
@@ -292,12 +296,20 @@ async function withHarness(
   }
 }
 
+/** Options for shaping the mock project/session state used by integration tests. */
 interface HarnessOptions {
+  /** Controls whether the mock session starts with a copied persisted selection entry. */
   includeStoredSelection?: boolean;
+  /** Overrides the default pool entries to exercise weighted selection scenarios. */
   entries?: ModelPoolEntry[];
+  /** Merges extra router config, such as sessionBoundary overrides, into the fixture. */
   configPatch?: Partial<RouterConfig>;
 }
 
+/**
+ * Builds a mocked Pi ExtensionContext and ExtensionAPI around project-local
+ * router config, ledger, session entries, model registry, UI, tools, and commands.
+ */
 async function createHarness(cwd: string, options: HarnessOptions = {}) {
   await mkdir(join(cwd, ".pi"), { recursive: true });
   await writeJson(join(cwd, ".pi", "settings.json"), { packages: ["pi-weighted-model-router"] });
@@ -446,6 +458,7 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
   };
 }
 
+/** Writes pretty-printed JSON fixtures with a trailing newline for deterministic tests. */
 async function writeJson(path: string, value: unknown): Promise<void> {
   const { writeFile } = await import("node:fs/promises");
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
