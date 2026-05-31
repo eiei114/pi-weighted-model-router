@@ -29,7 +29,7 @@ pi install -l npm:pi-weighted-model-router
 To pin a specific version:
 
 ```bash
-pi install npm:pi-weighted-model-router@0.2.3
+pi install npm:pi-weighted-model-router@0.3.0
 ```
 
 From a local checkout:
@@ -107,9 +107,29 @@ Provider and model IDs must exist in pi's model registry. If a model is register
 
 `sessionBoundary` is optional. Defaults restore the saved model for `startup` and `resume`, but reselect on `new`, `reload`, and `fork` even when the previous session contains a saved router selection.
 
+## Session Boundary Behavior
+
+The router decides whether to restore or reselect based on the session start reason. Defaults are:
+
+| Session start reason | Default action | Notes |
+| --- | --- | --- |
+| `startup` | Restore | Attempts to reuse the saved router selection from the prior session. |
+| `resume` | Restore | Continues the last session with the same router-selected model. |
+| `new` | Reselect | Chooses a fresh weighted entry and records reason `new`. |
+| `reload` | Reselect | Reloading the extension picks a new weighted entry. |
+| `fork` | Reselect | Forked sessions can diverge from the parent selection. |
+
+Manual boundaries that trigger a reselect without starting a new session:
+
+| Trigger | Action | Notes |
+| --- | --- | --- |
+| `/model-router next` | Reselect | Keeps the same session, excludes the previous selection, reason `next`. |
+| Config save | Reselect | `model_router_config` save (or `/model-router` configure) uses reason `config`. |
+| Manual `/model` or Ctrl+P | Outside router | Manual picks persist until the next router boundary (`new`, `reload`, `fork`, `next`, `config`). |
+
 ## Manual Model Changes
 
-Manual model selection through pi (for example `/model` or the Ctrl+P model picker) is outside the router's control. The manual choice remains active until the next router boundary that reselects a model, such as `new`, `reload`, `fork`, or a confirmed config save.
+Manual model selection through pi (for example `/model` or the Ctrl+P model picker) is outside the router's control. The manual choice remains active until the next router boundary that reselects a model, such as `new`, `reload`, `fork`, `/model-router next`, or a confirmed config save.
 
 ## Usage
 
