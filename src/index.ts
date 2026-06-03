@@ -11,6 +11,7 @@ import { recordSuccess, successCounts } from "./ledger.js";
 import { formatUnknownModelMessage } from "./model-suggestions.js";
 import { rankDailyBalanced, withoutAttempted } from "./selector.js";
 import { isSessionStartReason, resolveSessionBoundaryAction } from "./session-boundary.js";
+import { runSerialized } from "./selection-serializer.js";
 import { readConfig, readLedger, readState, routerPaths, writeConfig, writeLedger, writeState } from "./storage.js";
 import type {
   ModelPoolEntry,
@@ -118,6 +119,20 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       notifyReselect?: boolean;
     } = {},
   ): Promise<SelectedModel | undefined> {
+    return runSerialized(async () => chooseAndSetModelBody(ctx, reason, options));
+  }
+
+  async function chooseAndSetModelBody(
+    ctx: ExtensionContext,
+    reason: SelectedModel["reason"],
+    options: {
+      excludeKeys?: string[];
+      preserveLedgerCommit?: boolean;
+      inputs?: string[];
+      previousModel?: SelectedModel;
+      notifyReselect?: boolean;
+    } = {},
+  ): Promise<SelectedModel | undefined> {
     if (!(await ensureRuntime(ctx)) || !config || !ledger) return undefined;
 
     const poolName = config.defaultPool;
@@ -183,6 +198,10 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
   }
 
   async function commitLedgerIfPending(ctx: ExtensionContext): Promise<void> {
+    await runSerialized(async () => commitLedgerIfPendingBody(ctx));
+  }
+
+  async function commitLedgerIfPendingBody(ctx: ExtensionContext): Promise<void> {
     if (!selected || selected.ledgerCommitted || !ledger) return;
 
     ledger = recordSuccess(ledger, todayKey(), selected.pool, selected.key);
@@ -249,33 +268,35 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
   }
 
   pi.on("session_start", async (event, ctx) => {
-    await loadConfig(ctx);
-    await loadLedger();
+    await runSerialized(async () => {
+      await loadConfig(ctx);
+      await loadLedger();
 
-    const reason = readSessionStartReason(event);
-    const action = resolveSessionBoundaryAction(reason, config);
+      const reason = readSessionStartReason(event);
+      const action = resolveSessionBoundaryAction(reason, config);
 
-    if (action === "reselect") {
-      const previous = selected ?? restoreSelection(ctx);
-      await chooseAndSetModel(ctx, sessionReasonToSelectionReason(reason), {
-        previousModel: previous,
-        notifyReselect: true,
-      });
-      return;
-    }
-
-    const restored = restoreSelection(ctx);
-    if (restored) {
-      const model = ctx.modelRegistry.find(restored.provider, restored.model);
-      if (model && (await pi.setModel(model))) {
-        selected = restored;
-        boundaryReason = reason;
-        updateStatus(ctx);
+      if (action === "reselect") {
+        const previous = selected ?? restoreSelection(ctx);
+        await chooseAndSetModelBody(ctx, sessionReasonToSelectionReason(reason), {
+          previousModel: previous,
+          notifyReselect: true,
+        });
         return;
       }
-    }
 
-    await chooseAndSetModel(ctx, "initial");
+      const restored = restoreSelection(ctx);
+      if (restored) {
+        const model = ctx.modelRegistry.find(restored.provider, restored.model);
+        if (model && (await pi.setModel(model))) {
+          selected = restored;
+          boundaryReason = reason;
+          updateStatus(ctx);
+          return;
+        }
+      }
+
+      await chooseAndSetModelBody(ctx, "initial");
+    });
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
@@ -287,39 +308,43 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", async (event, ctx) => {
-    requiredInputs = event.images && event.images.length > 0 ? ["image"] : [];
-    if (!(await ensureRuntime(ctx))) return;
+    await runSerialized(async () => {
+      requiredInputs = event.images && event.images.length > 0 ? ["image"] : [];
+      if (!(await ensureRuntime(ctx))) return;
 
-    if (!selected) {
-      await chooseAndSetModel(ctx, "initial", { inputs: requiredInputs });
-      return;
-    }
+      if (!selected) {
+        await chooseAndSetModelBody(ctx, "initial", { inputs: requiredInputs });
+        return;
+      }
 
-    const activeModel = ctx.modelRegistry.find(selected.provider, selected.model);
-    const canHandlePrompt = requiredInputs.every((input) => activeModel && modelSupportsInput(activeModel, input));
-    if (!canHandlePrompt) {
-      await chooseAndSetModel(ctx, "capability", {
+      const activeModel = ctx.modelRegistry.find(selected.provider, selected.model);
+      const canHandlePrompt = requiredInputs.every((input) => activeModel && modelSupportsInput(activeModel, input));
+      if (!canHandlePrompt) {
+        await chooseAndSetModelBody(ctx, "capability", {
+          inputs: requiredInputs,
+          excludeKeys: selected.attemptedKeys,
+          preserveLedgerCommit: selected.ledgerCommitted,
+        });
+      }
+    });
+  });
+
+  pi.on("after_provider_response", async (event, ctx) => {
+    await runSerialized(async () => {
+      if (!selected || !config) return;
+
+      if (event.status >= 200 && event.status < 300) {
+        await commitLedgerIfPendingBody(ctx);
+        return;
+      }
+
+      if (!runtimeFallbackEnabled(config) || !fallbackStatuses(config).has(event.status)) return;
+
+      await chooseAndSetModelBody(ctx, "fallback", {
         inputs: requiredInputs,
         excludeKeys: selected.attemptedKeys,
         preserveLedgerCommit: selected.ledgerCommitted,
       });
-    }
-  });
-
-  pi.on("after_provider_response", async (event, ctx) => {
-    if (!selected || !config) return;
-
-    if (event.status >= 200 && event.status < 300) {
-      await commitLedgerIfPending(ctx);
-      return;
-    }
-
-    if (!runtimeFallbackEnabled(config) || !fallbackStatuses(config).has(event.status)) return;
-
-    await chooseAndSetModel(ctx, "fallback", {
-      inputs: requiredInputs,
-      excludeKeys: selected.attemptedKeys,
-      preserveLedgerCommit: selected.ledgerCommitted,
     });
   });
 
@@ -334,7 +359,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     handler: async (args, ctx) => {
       const subcommand = args.trim();
       if (subcommand === "next") {
-        await reselectNext(ctx);
+        await runSerialized(() => reselectNext(ctx));
         return;
       }
 
@@ -358,7 +383,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       ]);
 
       if (choice === "Next model") {
-        await reselectNext(ctx);
+        await runSerialized(() => reselectNext(ctx));
         return;
       }
 
@@ -414,7 +439,9 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       await writeConfig(paths.config, nextConfig);
       config = nextConfig;
       const previous = selected;
-      await chooseAndSetModel(ctx, "config", { previousModel: previous, notifyReselect: Boolean(previous) });
+      await runSerialized(() =>
+        chooseAndSetModelBody(ctx, "config", { previousModel: previous, notifyReselect: Boolean(previous) }),
+      );
       return textResult("Config saved.", { configPath: paths.config });
     },
   });
