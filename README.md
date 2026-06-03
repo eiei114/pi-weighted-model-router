@@ -169,6 +169,10 @@ You can also choose `Next model` from `/model-router`. The conversation history 
 
 The README uses placeholder provider and model IDs. Do not publish local config files, API keys, account identifiers, or provider-specific contract details.
 
+## Concurrency
+
+Selection, ledger commit, and session-boundary handlers share in-memory state inside one extension instance. Overlapping async handlers can interleave unless serialized. See [docs/RACE_CONDITIONS.md](docs/RACE_CONDITIONS.md) for risks, mitigations, and follow-up ideas.
+
 ## Development
 
 ```bash
