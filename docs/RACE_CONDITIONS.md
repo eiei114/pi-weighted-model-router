@@ -59,6 +59,8 @@ Serialized entry points:
 
 This preserves existing single-threaded semantics Pi expects without a larger state-machine refactor.
 
+`runSerialized` is **non-reentrant**: calling it from inside an already-serialized task deadlocks. Internal calls from serialized handlers must use the unwrapped `*Body` functions (for example `chooseAndSetModelBody`, `commitLedgerIfPendingBody`, `reselectNextBody`) instead of the public wrappers.
+
 ## Edge cases (documented behavior)
 
 | Scenario | Expected behavior |

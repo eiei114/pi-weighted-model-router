@@ -241,13 +241,17 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
    * usable pool entry when one is available; ledger usage is still deferred until
    * the first successful provider response commits the new selection.
    */
-  async function reselectNext(ctx: ExtensionContext): Promise<void> {
+  async function reselectNextBody(ctx: ExtensionContext): Promise<void> {
     const previous = selected ?? restoreSelection(ctx);
-    await chooseAndSetModel(ctx, "next", {
+    await chooseAndSetModelBody(ctx, "next", {
       excludeKeys: previous ? [previous.key] : undefined,
       previousModel: previous,
       notifyReselect: true,
     });
+  }
+
+  async function reselectNext(ctx: ExtensionContext): Promise<void> {
+    await runSerialized(() => reselectNextBody(ctx));
   }
 
   function formatStatus(snapshot: StatusSnapshot): string {
@@ -359,7 +363,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     handler: async (args, ctx) => {
       const subcommand = args.trim();
       if (subcommand === "next") {
-        await runSerialized(() => reselectNext(ctx));
+        await reselectNext(ctx);
         return;
       }
 
@@ -383,7 +387,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       ]);
 
       if (choice === "Next model") {
-        await runSerialized(() => reselectNext(ctx));
+        await reselectNext(ctx);
         return;
       }
 
