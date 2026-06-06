@@ -1,4 +1,11 @@
 # pi-weighted-model-router
+[![CI](https://github.com/eiei114/pi-weighted-model-router/actions/workflows/ci.yml/badge.svg)](https://github.com/eiei114/pi-weighted-model-router/actions/workflows/ci.yml)
+[![Publish](https://github.com/eiei114/pi-weighted-model-router/actions/workflows/publish.yml/badge.svg)](https://github.com/eiei114/pi-weighted-model-router/actions/workflows/publish.yml)
+[![npm version](https://img.shields.io/npm/v/pi-weighted-model-router)](https://www.npmjs.com/package/pi-weighted-model-router)
+[![npm downloads](https://img.shields.io/npm/dw/pi-weighted-model-router)](https://www.npmjs.com/package/pi-weighted-model-router)
+[![License: MIT](https://img.shields.io/github/license/eiei114/pi-weighted-model-router)](https://github.com/eiei114/pi-weighted-model-router/blob/main/LICENSE)
+![Pi Package](https://img.shields.io/badge/Pi-Package-blue)
+[![Trusted Publishing](https://img.shields.io/badge/npm-provenance-yellow)](https://docs.npmjs.com/generating-provenance-statements)
 
 Pi extension that selects a model from weighted pools at session start, then keeps the session on that model unless a provider error or input capability requires fallback.
 
