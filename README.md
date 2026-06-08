@@ -180,6 +180,12 @@ The README uses placeholder provider and model IDs. Do not publish local config 
 
 Selection, ledger commit, and session-boundary handlers share in-memory state inside one extension instance. Overlapping async handlers can interleave unless serialized. See [docs/RACE_CONDITIONS.md](docs/RACE_CONDITIONS.md) for risks, mitigations, and follow-up ideas.
 
+## Security
+
+Pi packages can execute code with your local permissions. Review extensions before installing third-party packages.
+
+For vulnerability reporting, see [`SECURITY.md`](SECURITY.md).
+
 ## Development
 
 ```bash
