@@ -17,7 +17,7 @@ Pi extension that selects a model from weighted pools at session start, then kee
 - Falls back to another pool candidate on provider failure statuses such as `400`, `429`, `500`, `502`, `503`, and `504`.
 - Switches to a compatible model before image prompts when the selected model does not support image input.
 - Exposes one tool, `model_router_config`, so the agent can help update config after confirmation.
-- Adds `/model-router` for a short status view or command-initiated weight setup.
+- Adds colon flat commands such as `/model-router:status`, `/model-router:next`, and `/model-router:configure` for status, reselection, and guided weight setup.
 
 ## Install
 
@@ -130,23 +130,23 @@ Manual boundaries that trigger a reselect without starting a new session:
 
 | Trigger | Action | Notes |
 | --- | --- | --- |
-| `/model-router next` | Reselect | Keeps the same session, excludes the previous selection, reason `next`. |
-| Config save | Reselect | `model_router_config` save (or `/model-router` configure) uses reason `config`. |
+| `/model-router:next` | Reselect | Keeps the same session, excludes the previous selection, reason `next`. |
+| Config save | Reselect | `model_router_config` save (or `/model-router:configure`) uses reason `config`. |
 | Manual `/model` or Ctrl+P | Outside router | Manual picks persist until the next router boundary (`new`, `reload`, `fork`, `next`, `config`). |
 
 ## Manual Model Changes
 
-Manual model selection through pi (for example `/model` or the Ctrl+P model picker) is outside the router's control. The manual choice remains active until the next router boundary that reselects a model, such as `new`, `reload`, `fork`, `/model-router next`, or a confirmed config save.
+Manual model selection through pi (for example `/model` or the Ctrl+P model picker) is outside the router's control. The manual choice remains active until the next router boundary that reselects a model, such as `new`, `reload`, `fork`, `/model-router:next`, or a confirmed config save.
 
 ## Usage
 
 Start guided setup from the command:
 
 ```text
-/model-router
+/model-router:configure
 ```
 
-Choose `Configure model weights`. The command sends a normal agent prompt that asks you about model candidates and desired weights one question at a time, then saves through `model_router_config` after confirmation.
+The command sends a normal agent prompt that asks you about model candidates and desired weights one question at a time, then saves through `model_router_config` after confirmation.
 
 You can also ask the agent in normal language:
 
@@ -156,21 +156,23 @@ Configure the model router so my primary GPT-5.5 provider has weight 7, my secon
 
 The agent should call `model_router_config`, show the change, and ask for confirmation before saving.
 
-Show current status from the same command:
+Show current status:
 
 ```text
-/model-router
+/model-router:status
 ```
 
-Choose `Show status`. Status includes current pool, current model, today's success counts, and config path.
+Status includes current pool, current model, today's success counts, and config path.
 
 Reselect a model at the current session boundary without starting a new session or reloading:
 
 ```text
-/model-router next
+/model-router:next
 ```
 
-You can also choose `Next model` from `/model-router`. The conversation history stays in the same session; the router appends a new `weighted-model-router-selection` entry with reason `next` and commits ledger usage only after the first successful provider response.
+The conversation history stays in the same session; the router appends a new `weighted-model-router-selection` entry with reason `next` and commits ledger usage only after the first successful provider response.
+
+Legacy `/model-router` with a selection menu and `/model-router next` remain available for one release; prefer the colon commands above.
 
 ## Privacy
 
