@@ -24,7 +24,7 @@ Handlers that can touch selection state concurrently:
 | `session_start` | Runs while the first `before_agent_start` may already be queued |
 | `before_agent_start` | Image capability fallback during prompt setup |
 | `after_provider_response` | Ledger commit on success; fallback reselect on error status |
-| `/model-router next` | Manual reselect while a response is in flight |
+| `/model-router:next` | Manual reselect while a response is in flight |
 | `model_router_config` save | Config reload + reselect while other handlers run |
 
 `selectDailyBalanced` and ledger helpers are pure functions; races come from unsynchronized read-modify-write on shared module state and non-atomic ledger file writes.
@@ -55,7 +55,7 @@ Serialized entry points:
 - `chooseAndSetModel`
 - `commitLedgerIfPending`
 - `session_start`, `before_agent_start`, `after_provider_response` handlers
-- `/model-router` handler and `model_router_config` save path when reselecting
+- `/model-router` and `/model-router:next` handlers and `model_router_config` save path when reselecting
 
 This preserves existing single-threaded semantics Pi expects without a larger state-machine refactor.
 
@@ -65,7 +65,7 @@ This preserves existing single-threaded semantics Pi expects without a larger st
 
 | Scenario | Expected behavior |
 | --- | --- |
-| Rapid `/model-router next` | Reselects run one at a time; each waits for the prior `pi.setModel` attempt to finish. |
+| Rapid `/model-router:next` | Reselects run one at a time; each waits for the prior `pi.setModel` attempt to finish. |
 | Session boundary + immediate prompt | `session_start` completes selection before `before_agent_start` capability check runs. |
 | Success + fallback status racing | Commit and fallback reselect cannot interleave; commit runs first when both were triggered. |
 | Network timeout on `pi.setModel` | Treated as failed candidate try inside `chooseAndSetModel`; no partial `selected` publish until success. |

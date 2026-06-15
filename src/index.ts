@@ -237,7 +237,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
   /**
    * Performs a manual session-boundary reselection without replacing the session.
    *
-   * The previous selection is excluded so `/model-router next` moves to a different
+   * The previous selection is excluded so `/model-router:next` moves to a different
    * usable pool entry when one is available; ledger usage is still deferred until
    * the first successful provider response commits the new selection.
    */
@@ -352,13 +352,45 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     });
   });
 
+  async function showStatus(ctx: ExtensionContext): Promise<void> {
+    await ensureRuntime(ctx);
+    ctx.ui.notify(formatStatus(createStatusSnapshot()), "info");
+  }
+
+  async function startConfigure(ctx: ExtensionContext): Promise<void> {
+    await ensureRuntime(ctx);
+    pi.sendUserMessage(buildWeightSetupPrompt(config, formatStatus(createStatusSnapshot())));
+  }
+
+  const COLON_COMMAND_ALIASES = [
+    { name: "model-router:status", action: "status", description: "show current router status" },
+    { name: "model-router:next", action: "next", description: "reselect the next weighted model in this session" },
+    { name: "model-router:configure", action: "configure", description: "start guided model weight setup" },
+  ] as const;
+
+  async function handleModelRouterAction(action: (typeof COLON_COMMAND_ALIASES)[number]["action"], ctx: ExtensionContext): Promise<void> {
+    if (action === "status") {
+      await showStatus(ctx);
+      return;
+    }
+    if (action === "next") {
+      await reselectNext(ctx);
+      return;
+    }
+    await startConfigure(ctx);
+  }
+
   pi.registerCommand("model-router", {
-    description: "Show weighted model router status, reselect the next model, or start guided weight setup",
+    description:
+      "Legacy model router command. Prefer colon commands such as /model-router:status.",
     getArgumentCompletions: (argumentPrefix) => {
       const commands = ["next"];
       return commands
         .filter((command) => command.startsWith(argumentPrefix.trim()))
-        .map((command) => ({ value: command, label: command }));
+        .map((command) => ({
+          value: command,
+          label: `${command} (legacy; prefer /model-router:${command})`,
+        }));
     },
     handler: async (args, ctx) => {
       const subcommand = args.trim();
@@ -368,7 +400,10 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       }
 
       if (subcommand) {
-        ctx.ui.notify(`Unknown model-router command: ${subcommand}`, "warning");
+        ctx.ui.notify(
+          `Unknown model-router command: ${subcommand}. Try /model-router:next, /model-router:status, or /model-router:configure.`,
+          "warning",
+        );
         return;
       }
 
@@ -399,6 +434,15 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       ctx.ui.notify(status, "info");
     },
   });
+
+  for (const alias of COLON_COMMAND_ALIASES) {
+    pi.registerCommand(alias.name, {
+      description: `Model router: ${alias.description}.`,
+      handler: async (_args, ctx) => {
+        await handleModelRouterAction(alias.action, ctx);
+      },
+    });
+  }
 
   pi.registerTool({
     name: "model_router_config",

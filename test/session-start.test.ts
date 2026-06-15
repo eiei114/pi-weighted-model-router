@@ -237,13 +237,13 @@ test("config save reselects with config reason", async () => {
   });
 });
 
-test("model-router next reselects without session reload and commits after success", async () => {
+test("model-router:next reselects without session reload and commits after success", async () => {
   await withHarness(async ({ handlers, commands, ctx, appended, notifications, statuses, ledgerCounts, sessionActions }) => {
     await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
     appended.length = 0;
     notifications.length = 0;
 
-    await commands["model-router"].handler("next", ctx);
+    await commands["model-router:next"].handler("", ctx);
 
     assert.deepEqual(sessionActions, []);
     assert.equal(appended.length, 1);
@@ -276,6 +276,42 @@ test("model-router menu can trigger next reselect", async () => {
     assert.equal(appended.length, 1);
     assert.equal(appended[0].data.reason, "next");
     assert.equal(appended[0].data.provider, "cursor");
+  });
+});
+
+test("registers colon flat commands and delegates to shared handlers", async () => {
+  await withHarness(async ({ handlers, commands, ctx, appended, notifications, userMessages }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    appended.length = 0;
+    notifications.length = 0;
+    userMessages.length = 0;
+
+    assert.ok(commands["model-router:status"]);
+    assert.ok(commands["model-router:next"]);
+    assert.ok(commands["model-router:configure"]);
+
+    await commands["model-router:status"].handler("", ctx);
+    assert.match(notifications.at(-1) ?? "", /^pool: main$/m);
+
+    await commands["model-router:next"].handler("", ctx);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "next");
+
+    await commands["model-router:configure"].handler("", ctx);
+    assert.equal(userMessages.length, 1);
+    assert.match(userMessages[0], /Start pi-weighted-model-router weight setup\./);
+  });
+});
+
+test("legacy model-router next remains available for one release", async () => {
+  await withHarness(async ({ handlers, commands, ctx, appended }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    appended.length = 0;
+
+    await commands["model-router"].handler("next", ctx);
+
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "next");
   });
 });
 
@@ -347,6 +383,7 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
   const statuses: Array<{ key: string; value: string | undefined }> = [];
   const controls = { setModelSuccess: true, selectChoice: undefined as string | undefined };
   const sessionActions: string[] = [];
+  const userMessages: string[] = [];
 
   const models = [
     { provider: "stored", id: "model", input: [] },
@@ -373,7 +410,9 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
     registerTool(tool: { name: string }) {
       tools[tool.name] = tool;
     },
-    sendUserMessage() {},
+    sendUserMessage(message: string) {
+      userMessages.push(message);
+    },
   };
 
   const ctx = {
@@ -451,6 +490,7 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
     statuses,
     controls,
     sessionActions,
+    userMessages,
     async ledgerCounts() {
       const ledger = await readLedger(paths.ledger);
       return successCounts(ledger, todayKey(), "main");
