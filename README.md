@@ -1,23 +1,27 @@
 # pi-weighted-model-router
+
 [![CI](https://github.com/eiei114/pi-weighted-model-router/actions/workflows/ci.yml/badge.svg)](https://github.com/eiei114/pi-weighted-model-router/actions/workflows/ci.yml)
 [![Publish](https://github.com/eiei114/pi-weighted-model-router/actions/workflows/publish.yml/badge.svg)](https://github.com/eiei114/pi-weighted-model-router/actions/workflows/publish.yml)
 [![npm version](https://img.shields.io/npm/v/pi-weighted-model-router)](https://www.npmjs.com/package/pi-weighted-model-router)
 [![npm downloads](https://img.shields.io/npm/dw/pi-weighted-model-router)](https://www.npmjs.com/package/pi-weighted-model-router)
 [![License: MIT](https://img.shields.io/github/license/eiei114/pi-weighted-model-router)](https://github.com/eiei114/pi-weighted-model-router/blob/main/LICENSE)
 ![Pi Package](https://img.shields.io/badge/Pi-Package-blue)
-[![Trusted Publishing](https://img.shields.io/badge/npm-provenance-yellow)](https://docs.npmjs.com/generating-provenance-statements)
+[![Trusted Publishing](https://img.shields.io/badge/npm-Trusted%20Publishing-blue.svg)](docs/release.md)
 
-Pi extension that selects a model from weighted pools at session start, then keeps the session on that model unless a provider error or input capability requires fallback.
+> Pi extension that selects a model from weighted pools at session start, then keeps the session on that model unless a provider error or input capability requires fallback.
 
-## What It Does
+## What this is
 
-- Picks one model from a named pool when a pi session starts.
-- Uses a daily balanced weighted strategy, so `7 / 2 / 1` stays close to that ratio across sessions in the same day.
-- Restores the same selected model when a session is resumed.
-- Falls back to another pool candidate on provider failure statuses such as `400`, `429`, `500`, `502`, `503`, and `504`.
-- Switches to a compatible model before image prompts when the selected model does not support image input.
-- Exposes one tool, `model_router_config`, so the agent can help update config after confirmation.
-- Adds colon flat commands such as `/model-router:status`, `/model-router:next`, and `/model-router:configure` for status, reselection, and guided weight setup.
+`pi-weighted-model-router` balances model and provider usage across weighted pools in Pi. It picks one entry when a session starts, restores that choice on resume when configured, and falls back to another pool candidate on provider errors or unsupported image input.
+
+## Features
+
+- Daily balanced weighted selection so weights such as `7 / 2 / 1` stay close to the configured ratio across sessions in the same day.
+- Session boundary policy: restore on `startup` and `resume`, reselect on `new`, `reload`, and `fork` by default.
+- Runtime fallback on provider failure statuses such as `400`, `429`, `500`, `502`, `503`, and `504`.
+- Image capability fallback before prompts when the selected model does not support image input.
+- Tool `model_router_config` for agent-guided config updates after confirmation.
+- Colon flat commands: `/model-router:status`, `/model-router:next`, and `/model-router:configure`.
 
 ## Install
 
@@ -33,10 +37,10 @@ Project-local install:
 pi install -l npm:pi-weighted-model-router
 ```
 
-To pin a specific version:
+Pin a specific version:
 
 ```bash
-pi install npm:pi-weighted-model-router@0.3.0
+pi install npm:pi-weighted-model-router@0.4.1
 ```
 
 From a local checkout:
@@ -45,8 +49,6 @@ From a local checkout:
 pi install /absolute/path/to/pi-weighted-model-router
 ```
 
-For this repository only, `.pi/settings.json` loads the local package from `../`. Start `pi` from this repository root and run `/reload` if an existing pi session is already open.
-
 For temporary testing:
 
 ```bash
@@ -54,139 +56,41 @@ pi -e npm:pi-weighted-model-router
 pi -e /absolute/path/to/pi-weighted-model-router
 ```
 
-## Config
+## Quick start
 
-When this repository is loaded through its project-local `.pi/settings.json`, config is stored at:
+1. Install the package with one of the commands above.
+2. Start Pi and run `/model-router:configure` for guided weight setup, or edit config directly (see [docs/usage.md](docs/usage.md)).
+3. Check status with `/model-router:status`.
 
-```text
-.pi/weighted-model-router/config.json
-```
+Config paths:
 
-When installed globally, config is stored at:
+- Project-local (`.pi/settings.json`): `.pi/weighted-model-router/config.json`
+- Global install: `~/.pi/agent/weighted-model-router/config.json`
 
-```text
-~/.pi/agent/weighted-model-router/config.json
-```
+For local development in this repository, `.pi/settings.json` loads the package from `../`. Start `pi` from the repo root and run `/reload` if a session is already open.
 
-Example config. Replace provider and model IDs with entries that exist in your pi model registry:
+## Usage summary
 
-```json
-{
-  "version": 1,
-  "defaultPool": "main",
-  "strategy": "smooth-weighted-daily",
-  "runtimeFallback": {
-    "enabled": true,
-    "statuses": [400, 429, 500, 502, 503, 504]
-  },
-  "sessionBoundary": {
-    "restoreOn": ["startup", "resume"],
-    "reselectOn": ["new", "reload", "fork"]
-  },
-  "pools": {
-    "main": {
-      "entries": [
-        {
-          "provider": "openai-codex",
-          "model": "gpt-5.5",
-          "weight": 7,
-          "label": "Primary GPT-5.5"
-        },
-        {
-          "provider": "cursor",
-          "model": "gpt-5.5",
-          "weight": 2,
-          "label": "Secondary GPT-5.5"
-        },
-        {
-          "provider": "another-provider",
-          "model": "gpt-5.5",
-          "weight": 1,
-          "label": "Tertiary GPT-5.5"
-        }
-      ]
-    }
-  }
-}
-```
-
-Provider and model IDs must exist in pi's model registry. If a model is registered but lacks credentials, the router skips it during selection. Some providers can also return `400` when a registered model is temporarily unavailable, disabled for the account, or unsupported by the upstream backend; by default that response is treated as a runtime fallback signal. The sample values are placeholders, not endorsements or guarantees that a provider exposes a specific model name.
-
-`sessionBoundary` is optional. Defaults restore the saved model for `startup` and `resume`, but reselect on `new`, `reload`, and `fork` even when the previous session contains a saved router selection.
-
-## Session Boundary Behavior
-
-The router decides whether to restore or reselect based on the session start reason. Defaults are:
-
-| Session start reason | Default action | Notes |
-| --- | --- | --- |
-| `startup` | Restore | Attempts to reuse the saved router selection from the prior session. |
-| `resume` | Restore | Continues the last session with the same router-selected model. |
-| `new` | Reselect | Chooses a fresh weighted entry and records reason `new`. |
-| `reload` | Reselect | Reloading the extension picks a new weighted entry. |
-| `fork` | Reselect | Forked sessions can diverge from the parent selection. |
-
-Manual boundaries that trigger a reselect without starting a new session:
-
-| Trigger | Action | Notes |
-| --- | --- | --- |
-| `/model-router:next` | Reselect | Keeps the same session, excludes the previous selection, reason `next`. |
-| Config save | Reselect | `model_router_config` save (or `/model-router:configure`) uses reason `config`. |
-| Manual `/model` or Ctrl+P | Outside router | Manual picks persist until the next router boundary (`new`, `reload`, `fork`, `next`, `config`). |
-
-## Manual Model Changes
-
-Manual model selection through pi (for example `/model` or the Ctrl+P model picker) is outside the router's control. The manual choice remains active until the next router boundary that reselects a model, such as `new`, `reload`, `fork`, `/model-router:next`, or a confirmed config save.
-
-## Usage
-
-Start guided setup from the command:
-
-```text
-/model-router:configure
-```
-
-The command sends a normal agent prompt that asks you about model candidates and desired weights one question at a time, then saves through `model_router_config` after confirmation.
-
-You can also ask the agent in normal language:
-
-```text
-Configure the model router so my primary GPT-5.5 provider has weight 7, my secondary GPT-5.5 provider has weight 2, and my tertiary GPT-5.5 provider has weight 1.
-```
-
-The agent should call `model_router_config`, show the change, and ask for confirmation before saving.
-
-Show current status:
-
-```text
-/model-router:status
-```
-
-Status includes current pool, current model, today's success counts, and config path.
-
-Reselect a model at the current session boundary without starting a new session or reloading:
-
-```text
-/model-router:next
-```
-
-The conversation history stays in the same session; the router appends a new `weighted-model-router-selection` entry with reason `next` and commits ledger usage only after the first successful provider response.
+| Command | Purpose |
+| --- | --- |
+| `/model-router:configure` | Guided setup through the agent and `model_router_config` |
+| `/model-router:status` | Current pool, model, today's success counts, and config path |
+| `/model-router:next` | Reselect within the same session without reload |
 
 Legacy `/model-router` with a selection menu and `/model-router next` remain available for one release; prefer the colon commands above.
 
-## Privacy
+Configuration, session boundary tables, manual model overrides, and privacy notes are in [docs/usage.md](docs/usage.md). Concurrency assumptions and mitigations are in [docs/RACE_CONDITIONS.md](docs/RACE_CONDITIONS.md).
 
-The README uses placeholder provider and model IDs. Do not publish local config files, API keys, account identifiers, or provider-specific contract details.
+## Package contents
 
-## Concurrency
-
-Selection, ledger commit, and session-boundary handlers share in-memory state inside one extension instance. Overlapping async handlers can interleave unless serialized. See [docs/RACE_CONDITIONS.md](docs/RACE_CONDITIONS.md) for risks, mitigations, and follow-up ideas.
-
-## Security
-
-Pi packages can execute code with your local permissions. Review extensions before installing third-party packages.
-
-For vulnerability reporting, see [`SECURITY.md`](SECURITY.md).
+| Path | Purpose |
+| --- | --- |
+| `src/` | Extension entrypoint and routing logic |
+| `docs/` | Usage, release, and concurrency decision docs |
+| `README.md` | Public entrypoint (this file) |
+| `SECURITY.md` | Vulnerability reporting |
+| `LICENSE` | MIT license |
+| `CHANGELOG.md` | Version history |
 
 ## Development
 
@@ -195,4 +99,33 @@ npm install
 npm run check
 ```
 
-The core selection, ledger, and config logic is testable without starting pi.
+The core selection, ledger, and config logic is testable without starting Pi.
+
+## Release
+
+This package uses npm Trusted Publishing with GitHub Actions OIDC — no `NPM_TOKEN` is required.
+
+```bash
+npm version patch
+git push
+```
+
+On `main`, `.github/workflows/auto-release.yml` creates the `v<version>` tag and GitHub Release, then dispatches `.github/workflows/publish.yml` to publish to npm.
+
+See [docs/release.md](docs/release.md) for setup details.
+
+## Security
+
+Pi packages can execute code with your local permissions. Review extensions before installing third-party packages.
+
+For vulnerability reporting, see [`SECURITY.md`](SECURITY.md).
+
+## Links
+
+- npm: https://www.npmjs.com/package/pi-weighted-model-router
+- GitHub: https://github.com/eiei114/pi-weighted-model-router
+- Issues: https://github.com/eiei114/pi-weighted-model-router/issues
+
+## License
+
+MIT
