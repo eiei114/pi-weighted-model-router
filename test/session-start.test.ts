@@ -315,6 +315,66 @@ test("legacy model-router next remains available for one release", async () => {
   });
 });
 
+
+test("before_agent_start reselects when selected model lacks image capability", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, notifications, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
+    setModels.length = 0;
+    appended.length = 0;
+    notifications.length = 0;
+
+    await handlers.before_agent_start({ type: "before_agent_start", images: [{ id: "img-1" }] }, ctx);
+
+    assert.deepEqual(setModels, ["cursor/gpt-5.5"]);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "capability");
+    assert.equal(appended[0].data.provider, "cursor");
+    assert.equal(appended[0].data.ledgerCommitted, false);
+    assert.deepEqual(notifications, []);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main cursor/gpt-5.5 [capability]" });
+  });
+});
+
+test("after_provider_response falls back on configured error statuses", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    setModels.length = 0;
+    appended.length = 0;
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 429, headers: {} }, ctx);
+
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "fallback");
+    assert.equal(appended[0].data.provider, "cursor");
+    assert.equal(appended[0].data.ledgerCommitted, false);
+    assert.deepEqual(setModels, ["cursor/gpt-5.5"]);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main cursor/gpt-5.5 [fallback]" });
+  });
+});
+
+test("after_provider_response ignores error statuses when runtime fallback is disabled", async () => {
+  await withHarness(async ({ handlers, tools, ctx, setModels, appended, statuses }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    setModels.length = 0;
+    appended.length = 0;
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 429, headers: {} }, ctx);
+
+    assert.equal(appended.length, 0);
+    assert.deepEqual(setModels, []);
+
+    const result = await tools.model_router_config.execute("tool-call", { action: "status" }, undefined, undefined, ctx);
+    const status = result.content[0].text;
+    assert.match(status, /^model: openai-codex\/gpt-5\.5$/m);
+    assert.match(status, /^boundary: reload$/m);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main openai-codex/gpt-5.5 [reload]" });
+  }, {
+    configPatch: {
+      runtimeFallback: { enabled: false },
+    },
+  });
+});
+
 /**
  * Creates an isolated temporary project, installs the mocked router extension,
  * and removes all project-local state after the supplied assertions complete.
@@ -388,7 +448,7 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
   const models = [
     { provider: "stored", id: "model", input: [] },
     { provider: "openai-codex", id: "gpt-5.5", input: [] },
-    { provider: "cursor", id: "gpt-5.5", input: [] },
+    { provider: "cursor", id: "gpt-5.5", input: ["image"] },
     { provider: "fallback", id: "gpt-5.5", input: [] },
   ];
 
@@ -477,6 +537,7 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
     handlers: handlers as {
       session_start: (event: { type: "session_start"; reason: SessionStartReason }, ctx: any) => Promise<void>;
       session_shutdown: (event: { type: "session_shutdown" }, ctx: any) => Promise<void> | void;
+      before_agent_start: (event: { type: "before_agent_start"; images?: unknown[] }, ctx: any) => Promise<void>;
       after_provider_response: (event: { type: "after_provider_response"; status: number; headers: Record<string, string> }, ctx: any) => Promise<void>;
     },
     ctx,
