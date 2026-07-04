@@ -7,6 +7,7 @@
 [![License: MIT](https://img.shields.io/github/license/eiei114/pi-weighted-model-router)](https://github.com/eiei114/pi-weighted-model-router/blob/main/LICENSE)
 ![Pi Package](https://img.shields.io/badge/Pi-Package-blue)
 [![Trusted Publishing](https://img.shields.io/badge/npm-Trusted%20Publishing-blue.svg)](docs/release.md)
+<a href="https://buymeacoffee.com/ekawano114m"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="217" height="60"></a>
 
 > Pi extension that selects a model from weighted pools at session start, then keeps the session on that model unless a provider error or input capability requires fallback.
 
