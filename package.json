@@ -1,6 +1,6 @@
 {
   "name": "pi-weighted-model-router",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Pi extension that balances model/provider usage across weighted model pools.",
   "type": "module",
   "license": "MIT",
