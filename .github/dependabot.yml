@@ -6,3 +6,8 @@ updates:
       interval: weekly
     target-branch: main
     open-pull-requests-limit: 10
+    groups:
+      npm-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
