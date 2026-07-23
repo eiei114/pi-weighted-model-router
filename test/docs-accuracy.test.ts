@@ -9,6 +9,7 @@ const packageVersion = JSON.parse(
   readFileSync(join(repoRoot, "package.json"), "utf8"),
 ).version as string;
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+const changelog = readFileSync(join(repoRoot, "CHANGELOG.md"), "utf8");
 
 test("README version pin matches package.json", () => {
   const pin = `pi install npm:pi-weighted-model-router@${packageVersion}`;
@@ -16,5 +17,13 @@ test("README version pin matches package.json", () => {
     readme,
     new RegExp(pin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     `README should document the current npm pin: ${pin}`,
+  );
+});
+
+test("CHANGELOG documents the current package version", () => {
+  assert.match(
+    changelog,
+    new RegExp(`^## \\[${packageVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "m"),
+    `CHANGELOG should include a release section for ${packageVersion}`,
   );
 });
