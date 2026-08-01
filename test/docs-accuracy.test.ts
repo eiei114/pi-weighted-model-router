@@ -27,3 +27,23 @@ test("CHANGELOG documents the current package version", () => {
     `CHANGELOG should include a release section for ${packageVersion}`,
   );
 });
+
+test("CHANGELOG keeps preamble above Unreleased", () => {
+  const unreleasedIndex = changelog.indexOf("## Unreleased");
+  assert.ok(unreleasedIndex >= 0, "CHANGELOG should include an Unreleased section");
+
+  const preamble = changelog.slice(0, unreleasedIndex);
+  assert.match(preamble, /Keep a Changelog/);
+  assert.match(preamble, /Semantic Versioning/);
+
+  const unreleasedBody = changelog
+    .slice(unreleasedIndex)
+    .replace(/^## Unreleased\s*/m, "")
+    .split(/^## \[/m)[0]
+    .trim();
+  assert.equal(
+    unreleasedBody,
+    "",
+    "Unreleased must stay empty until the next release notes land",
+  );
+});
