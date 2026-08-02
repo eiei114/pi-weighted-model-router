@@ -39,7 +39,7 @@ test("CHANGELOG keeps preamble above Unreleased", () => {
   const unreleasedBody = changelog
     .slice(unreleasedIndex)
     .replace(/^## Unreleased\s*/m, "")
-    .split(/^## \[/m)[0]
+    .split(/^## /m)[0]
     .trim();
   assert.equal(
     unreleasedBody,
