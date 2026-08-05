@@ -122,7 +122,7 @@ Status includes current pool, current model, today's success counts, and config 
 
 The conversation history stays in the same session; the router appends a new `weighted-model-router-selection` entry with reason `next` and commits ledger usage only after the first successful provider response.
 
-Legacy `/model-router` with a selection menu and `/model-router next` remain available for one release; prefer the colon commands above.
+Legacy `/model-router` with a selection menu and `/model-router next` remain available as deprecated aliases; prefer the colon commands above.
 
 ## Privacy
 

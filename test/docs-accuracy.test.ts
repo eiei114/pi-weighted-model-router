@@ -9,6 +9,7 @@ const packageVersion = JSON.parse(
   readFileSync(join(repoRoot, "package.json"), "utf8"),
 ).version as string;
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
+const usageDoc = readFileSync(join(repoRoot, "docs/usage.md"), "utf8");
 const changelog = readFileSync(join(repoRoot, "CHANGELOG.md"), "utf8");
 
 test("README version pin matches package.json", () => {
@@ -26,6 +27,19 @@ test("CHANGELOG documents the current package version", () => {
     new RegExp(`^## \\[${packageVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "m"),
     `CHANGELOG should include a release section for ${packageVersion}`,
   );
+});
+
+test("legacy command docs do not claim a one-release support window", () => {
+  for (const [label, doc] of [
+    ["README.md", readme],
+    ["docs/usage.md", usageDoc],
+  ] as const) {
+    assert.doesNotMatch(
+      doc,
+      /for one release/i,
+      `${label} should not describe legacy commands as limited to one release`,
+    );
+  }
 });
 
 test("CHANGELOG keeps preamble above Unreleased", () => {
