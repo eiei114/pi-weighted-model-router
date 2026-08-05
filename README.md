@@ -80,7 +80,7 @@ For local development in this repository, `.pi/settings.json` loads the package 
 | `/model-router:status` | Current pool, model, today's success counts, and config path |
 | `/model-router:next` | Reselect within the same session without reload |
 
-Legacy `/model-router` with a selection menu and `/model-router next` remain available for one release; prefer the colon commands above.
+Legacy `/model-router` with a selection menu and `/model-router next` remain available as deprecated aliases; prefer the colon commands above.
 
 Configuration, session boundary tables, manual model overrides, and privacy notes are in [docs/usage.md](docs/usage.md). Concurrency assumptions and mitigations are in [docs/RACE_CONDITIONS.md](docs/RACE_CONDITIONS.md).
 
@@ -131,4 +131,4 @@ For vulnerability reporting, see [`SECURITY.md`](SECURITY.md).
 
 ## License
 
-MIT
+MIT

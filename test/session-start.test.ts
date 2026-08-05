@@ -303,7 +303,7 @@ test("registers colon flat commands and delegates to shared handlers", async () 
   });
 });
 
-test("legacy model-router next remains available for one release", async () => {
+test("legacy model-router next remains available as deprecated alias", async () => {
   await withHarness(async ({ handlers, commands, ctx, appended }) => {
     await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
     appended.length = 0;
