@@ -39,6 +39,11 @@ test("legacy command docs do not claim a one-release support window", () => {
       /for one release/i,
       `${label} should not describe legacy commands as limited to one release`,
     );
+    assert.match(
+      doc,
+      /Legacy `\/model-router`[\s\S]*?`\/model-router next`[\s\S]*?deprecated aliases/i,
+      `${label} should identify both legacy commands as deprecated aliases`,
+    );
   }
 });
 
