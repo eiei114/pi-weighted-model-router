@@ -33,12 +33,19 @@ test("legacy command docs do not claim a one-release support window", () => {
   for (const [label, doc] of [
     ["README.md", readme],
     ["docs/usage.md", usageDoc],
+    ["CHANGELOG.md", changelog],
   ] as const) {
     assert.doesNotMatch(
       doc,
       /for one release/i,
       `${label} should not describe legacy commands as limited to one release`,
     );
+  }
+
+  for (const [label, doc] of [
+    ["README.md", readme],
+    ["docs/usage.md", usageDoc],
+  ] as const) {
     assert.match(
       doc,
       /Legacy `\/model-router`[\s\S]*?`\/model-router next`[\s\S]*?deprecated aliases/i,
