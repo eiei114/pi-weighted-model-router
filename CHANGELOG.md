@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Colon flat Pi commands for model-router actions (`/model-router:status`, `/model-router:next`, `/model-router:configure`) while keeping legacy `/model-router` space dispatch for one release.
+- Colon flat Pi commands for model-router actions (`/model-router:status`, `/model-router:next`, `/model-router:configure`) while keeping legacy `/model-router` space dispatch available as deprecated aliases.
 
 ## [0.3.2] - 2026-06-07
 
