@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { defaultConfig } from "../src/config.js";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const packageVersion = JSON.parse(
@@ -26,6 +27,22 @@ test("CHANGELOG documents the current package version", () => {
     changelog,
     new RegExp(`^## \\[${packageVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]`, "m"),
     `CHANGELOG should include a release section for ${packageVersion}`,
+  );
+});
+
+test("usage example providers match default config placeholders", () => {
+  const entries = defaultConfig().pools.main.entries;
+  for (const entry of entries) {
+    assert.match(
+      usageDoc,
+      new RegExp(`"provider": "${entry.provider.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`),
+      `docs/usage.md should document the default placeholder provider "${entry.provider}"`,
+    );
+  }
+  assert.doesNotMatch(
+    usageDoc,
+    /another-provider/,
+    "docs/usage.md should not reference stale provider id another-provider",
   );
 });
 

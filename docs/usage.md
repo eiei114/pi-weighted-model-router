@@ -49,10 +49,10 @@ Replace provider and model IDs with entries that exist in your Pi model registry
           "label": "Secondary GPT-5.5"
         },
         {
-          "provider": "another-provider",
+          "provider": "example-provider",
           "model": "gpt-5.5",
           "weight": 1,
-          "label": "Tertiary GPT-5.5"
+          "label": "Fallback GPT-5.5"
         }
       ]
     }
