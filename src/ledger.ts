@@ -1,3 +1,4 @@
+import { isRecord } from "./guards.js";
 import { LEDGER_VERSION, type PoolLedger, type RouterLedger } from "./types.js";
 
 export function emptyLedger(): RouterLedger {
@@ -50,8 +51,4 @@ function readCounts(value: unknown): Record<string, number> {
     if (typeof count === "number" && Number.isInteger(count) && count >= 0) counts[key] = count;
   }
   return counts;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
