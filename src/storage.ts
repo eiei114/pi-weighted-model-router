@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { validateConfigShape } from "./config.js";
+import { isRecord } from "./guards.js";
 import { emptyLedger, validateLedgerShape } from "./ledger.js";
 import { CONFIG_VERSION, LEDGER_VERSION, type RouterConfig, type RouterLedger, type RouterPaths, type RouterState } from "./types.js";
 
@@ -62,8 +63,4 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

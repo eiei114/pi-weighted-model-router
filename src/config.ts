@@ -4,6 +4,7 @@ import {
   type RouterConfig,
   type SessionStartReason,
 } from "./types.js";
+import { isRecord } from "./guards.js";
 import { modelKey } from "./keys.js";
 import { DEFAULT_RESELECT_ON, DEFAULT_RESTORE_ON, isSessionStartReason } from "./session-boundary.js";
 
@@ -119,11 +120,6 @@ export function validateConfigShape(value: unknown): RouterConfig {
   }
 
   return config;
-}
-
-/** Returns true when a value can be safely inspected as a plain object record. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** Reads a required, non-empty string field from untrusted config input. */

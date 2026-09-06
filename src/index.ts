@@ -6,6 +6,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { defaultConfig, fallbackStatuses, runtimeFallbackEnabled, validateConfigShape } from "./config.js";
+import { isRecord } from "./guards.js";
 import { modelKey, todayKey } from "./keys.js";
 import { recordSuccess, successCounts } from "./ledger.js";
 import { formatUnknownModelMessage } from "./model-suggestions.js";
@@ -605,8 +606,4 @@ function textResult(text: string, details: Record<string, unknown> = {}) {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
