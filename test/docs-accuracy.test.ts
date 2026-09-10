@@ -30,7 +30,7 @@ test("CHANGELOG documents the current package version", () => {
   );
 });
 
-test("usage example providers match default config placeholders", () => {
+test("usage example entries match default config placeholders", () => {
   const entries = defaultConfig().pools.main.entries;
   for (const entry of entries) {
     assert.match(
@@ -38,11 +38,23 @@ test("usage example providers match default config placeholders", () => {
       new RegExp(`"provider": "${entry.provider.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`),
       `docs/usage.md should document the default placeholder provider "${entry.provider}"`,
     );
+    if (entry.label) {
+      assert.match(
+        usageDoc,
+        new RegExp(`"label": "${entry.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`),
+        `docs/usage.md should document the default placeholder label "${entry.label}"`,
+      );
+    }
   }
   assert.doesNotMatch(
     usageDoc,
     /another-provider/,
     "docs/usage.md should not reference stale provider id another-provider",
+  );
+  assert.doesNotMatch(
+    usageDoc,
+    /Primary GPT-5\.5|Secondary GPT-5\.5/,
+    "docs/usage.md should not reference stale primary/secondary example labels",
   );
 });
 

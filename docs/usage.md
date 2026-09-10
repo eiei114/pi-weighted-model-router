@@ -40,13 +40,13 @@ Replace provider and model IDs with entries that exist in your Pi model registry
           "provider": "openai-codex",
           "model": "gpt-5.5",
           "weight": 7,
-          "label": "Primary GPT-5.5"
+          "label": "OpenAI Codex GPT-5.5"
         },
         {
           "provider": "cursor",
           "model": "gpt-5.5",
           "weight": 2,
-          "label": "Secondary GPT-5.5"
+          "label": "Cursor GPT-5.5"
         },
         {
           "provider": "example-provider",
