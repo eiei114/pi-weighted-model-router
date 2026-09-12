@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.5.0] - 2026-09-13
+
+### Added
+
+- Add read-only `/model-router:diagnostics` command and `model_router_config` action `diagnostics` to report session boundary restore/reselect intent and persisted selection warnings without switching models.
+- Document diagnostics versus status versus next in `docs/usage.md`.
+
 ## [0.4.5] - 2026-08-22
 
 ### Changed
