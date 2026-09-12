@@ -114,6 +114,42 @@ The agent should call `model_router_config`, show the change, and ask for confir
 
 Status includes current pool, current model, today's success counts, and config path.
 
+### Diagnostics
+
+```text
+/model-router:diagnostics
+```
+
+Diagnostics is read-only. It reports the active session boundary reason, whether the configured policy would restore or reselect at that boundary, and the active versus persisted selection state. Use it when you need to inspect boundary decisions without changing the model.
+
+Use `/model-router:status` for day-to-day pool, model, and ledger counts. Use `/model-router:diagnostics` when startup, resume, reload, or fork behavior looks wrong. Use `/model-router:next` only when you intentionally want a new weighted selection in the current session.
+
+Example after process startup or resume (restore intent):
+
+```text
+boundary reason: startup
+policy intent: restore
+active selection: openai-codex/gpt-5.5
+persisted selection: openai-codex/gpt-5.5
+warnings: (none)
+config: .pi/weighted-model-router/config.json
+```
+
+Example after a new session or extension reload (reselect intent):
+
+```text
+boundary reason: reload
+policy intent: reselect
+active selection: cursor/gpt-5.5
+persisted selection: openai-codex/gpt-5.5
+warnings: (none)
+config: .pi/weighted-model-router/config.json
+```
+
+When persisted state is missing or stale, diagnostics adds explicit `warning:` lines and still returns without switching models.
+
+The `model_router_config` tool also accepts `action: "diagnostics"` with the same output.
+
 ### Reselect in session
 
 ```text

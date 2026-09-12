@@ -100,3 +100,12 @@ export interface StatusSnapshot {
   today: string;
   counts: Record<string, number>;
 }
+
+export interface DiagnosticsSnapshot {
+  configPath: string;
+  config?: RouterConfig;
+  selected?: SelectedModel;
+  persisted?: SelectedModel;
+  boundaryReason?: RouterBoundaryReason;
+  warnings: string[];
+}

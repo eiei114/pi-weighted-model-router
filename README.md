@@ -24,7 +24,7 @@
 - Runtime fallback on provider failure statuses such as `400`, `429`, `500`, `502`, `503`, and `504`.
 - Image capability fallback before prompts when the selected model does not support image input.
 - Tool `model_router_config` for agent-guided config updates after confirmation.
-- Colon flat commands: `/model-router:status`, `/model-router:next`, and `/model-router:configure`.
+- Colon flat commands: `/model-router:status`, `/model-router:diagnostics`, `/model-router:next`, and `/model-router:configure`.
 
 ## Install
 
@@ -43,7 +43,7 @@ pi install -l npm:pi-weighted-model-router
 Pin a specific version:
 
 ```bash
-pi install npm:pi-weighted-model-router@0.4.5
+pi install npm:pi-weighted-model-router@0.5.0
 ```
 
 From a local checkout:
@@ -78,6 +78,7 @@ For local development in this repository, `.pi/settings.json` loads the package 
 | --- | --- |
 | `/model-router:configure` | Guided setup through the agent and `model_router_config` |
 | `/model-router:status` | Current pool, model, today's success counts, and config path |
+| `/model-router:diagnostics` | Read-only boundary policy and persisted selection diagnostics |
 | `/model-router:next` | Reselect within the same session without reload |
 
 Legacy `/model-router` with a selection menu and `/model-router next` remain available as deprecated aliases; prefer the colon commands above.

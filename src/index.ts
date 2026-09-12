@@ -11,6 +11,7 @@ import { modelKey, todayKey } from "./keys.js";
 import { recordSuccess, successCounts } from "./ledger.js";
 import { formatUnknownModelMessage } from "./model-suggestions.js";
 import { rankDailyBalanced, withoutAttempted } from "./selector.js";
+import { buildDiagnosticsWarnings, formatDiagnostics } from "./diagnostics.js";
 import { isSessionStartReason, resolveSessionBoundaryAction } from "./session-boundary.js";
 import { runSerialized } from "./selection-serializer.js";
 import { readConfig, readLedger, readState, routerPaths, writeConfig, writeLedger, writeState } from "./storage.js";
@@ -22,6 +23,7 @@ import type {
   RouterPaths,
   SelectedModel,
   SessionStartReason,
+  DiagnosticsSnapshot,
   StatusSnapshot,
 } from "./types.js";
 
@@ -235,6 +237,18 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     };
   }
 
+  function createDiagnosticsSnapshot(ctx: ExtensionContext): DiagnosticsSnapshot {
+    const persisted = restoreSelection(ctx);
+    return {
+      configPath: paths.config,
+      config,
+      selected,
+      persisted,
+      boundaryReason,
+      warnings: buildDiagnosticsWarnings(ctx, { config, selected, persisted }),
+    };
+  }
+
   /**
    * Performs a manual session-boundary reselection without replacing the session.
    *
@@ -358,6 +372,12 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
     ctx.ui.notify(formatStatus(createStatusSnapshot()), "info");
   }
 
+  async function showDiagnostics(ctx: ExtensionContext): Promise<void> {
+    syncPaths(ctx);
+    await loadConfig(ctx);
+    ctx.ui.notify(formatDiagnostics(createDiagnosticsSnapshot(ctx)), "info");
+  }
+
   async function startConfigure(ctx: ExtensionContext): Promise<void> {
     await ensureRuntime(ctx);
     pi.sendUserMessage(buildWeightSetupPrompt(config, formatStatus(createStatusSnapshot())));
@@ -365,13 +385,21 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
   const COLON_COMMAND_ALIASES = [
     { name: "model-router:status", action: "status", description: "show current router status" },
+    { name: "model-router:diagnostics", action: "diagnostics", description: "show boundary policy and persisted state diagnostics" },
     { name: "model-router:next", action: "next", description: "reselect the next weighted model in this session" },
     { name: "model-router:configure", action: "configure", description: "start guided model weight setup" },
   ] as const;
 
-  async function handleModelRouterAction(action: (typeof COLON_COMMAND_ALIASES)[number]["action"], ctx: ExtensionContext): Promise<void> {
+  async function handleModelRouterAction(
+    action: (typeof COLON_COMMAND_ALIASES)[number]["action"],
+    ctx: ExtensionContext,
+  ): Promise<void> {
     if (action === "status") {
       await showStatus(ctx);
+      return;
+    }
+    if (action === "diagnostics") {
+      await showDiagnostics(ctx);
       return;
     }
     if (action === "next") {
@@ -402,7 +430,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
       if (subcommand) {
         ctx.ui.notify(
-          `Unknown model-router command: ${subcommand}. Try /model-router:next, /model-router:status, or /model-router:configure.`,
+          `Unknown model-router command: ${subcommand}. Try /model-router:next, /model-router:status, /model-router:diagnostics, or /model-router:configure.`,
           "warning",
         );
         return;
@@ -455,13 +483,19 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       "Use model_router_config with action=save only after preparing the complete JSON config for the user; the tool asks for confirmation before writing.",
     ],
     parameters: Type.Object({
-      action: StringEnum(["read", "status", "validate", "save"] as const),
+      action: StringEnum(["read", "status", "diagnostics", "validate", "save"] as const),
       configJson: Type.Optional(Type.String({ description: "Full RouterConfig JSON for validate or save." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (params.action === "status") {
         await ensureRuntime(ctx);
         return textResult(formatStatus(createStatusSnapshot()));
+      }
+
+      if (params.action === "diagnostics") {
+        syncPaths(ctx);
+        await loadConfig(ctx);
+        return textResult(formatDiagnostics(createDiagnosticsSnapshot(ctx)));
       }
 
       if (params.action === "read") {

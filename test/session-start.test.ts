@@ -287,11 +287,15 @@ test("registers colon flat commands and delegates to shared handlers", async () 
     userMessages.length = 0;
 
     assert.ok(commands["model-router:status"]);
+    assert.ok(commands["model-router:diagnostics"]);
     assert.ok(commands["model-router:next"]);
     assert.ok(commands["model-router:configure"]);
 
     await commands["model-router:status"].handler("", ctx);
     assert.match(notifications.at(-1) ?? "", /^pool: main$/m);
+
+    await commands["model-router:diagnostics"].handler("", ctx);
+    assert.match(notifications.at(-1) ?? "", /^policy intent: reselect$/m);
 
     await commands["model-router:next"].handler("", ctx);
     assert.equal(appended.length, 1);
@@ -300,6 +304,68 @@ test("registers colon flat commands and delegates to shared handlers", async () 
     await commands["model-router:configure"].handler("", ctx);
     assert.equal(userMessages.length, 1);
     assert.match(userMessages[0], /Start pi-weighted-model-router weight setup\./);
+  });
+});
+
+test("diagnostics reports restore intent after startup", async () => {
+  await withHarness(async ({ handlers, commands, ctx, notifications }) => {
+    await handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
+    notifications.length = 0;
+
+    await commands["model-router:diagnostics"].handler("", ctx);
+    const output = notifications.at(-1) ?? "";
+
+    assert.match(output, /^boundary reason: startup$/m);
+    assert.match(output, /^policy intent: restore$/m);
+    assert.match(output, /^active selection: stored\/model$/m);
+    assert.match(output, /^persisted selection: stored\/model$/m);
+    assert.match(output, /^warning: persisted model stored\/model is not in pool "main"$/m);
+  });
+});
+
+test("diagnostics reports reselect intent after reload", async () => {
+  await withHarness(async ({ handlers, commands, ctx, notifications }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    notifications.length = 0;
+
+    await commands["model-router:diagnostics"].handler("", ctx);
+    const output = notifications.at(-1) ?? "";
+
+    assert.match(output, /^boundary reason: reload$/m);
+    assert.match(output, /^policy intent: reselect$/m);
+    assert.match(output, /^active selection: openai-codex\/gpt-5\.5$/m);
+  });
+});
+
+test("diagnostics warns when persisted selection is missing", async () => {
+  await withHarness(async ({ commands, ctx, notifications }) => {
+    await commands["model-router:diagnostics"].handler("", ctx);
+    const output = notifications.at(-1) ?? "";
+
+    assert.match(output, /^boundary reason: \(none\)$/m);
+    assert.match(output, /^policy intent: \(none\)$/m);
+    assert.match(output, /^warning: no persisted selection entry in session$/m);
+  }, { includeStoredSelection: false });
+});
+
+test("diagnostics does not mutate session state", async () => {
+  await withHarness(async ({ handlers, commands, tools, ctx, appended, setModels }) => {
+    await handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
+    appended.length = 0;
+    setModels.length = 0;
+
+    await commands["model-router:diagnostics"].handler("", ctx);
+    const toolResult = await tools.model_router_config.execute(
+      "tool-call",
+      { action: "diagnostics" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    assert.equal(appended.length, 0);
+    assert.deepEqual(setModels, []);
+    assert.match(toolResult.content[0].text, /^policy intent: restore$/m);
   });
 });
 
