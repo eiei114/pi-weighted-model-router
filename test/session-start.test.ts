@@ -334,6 +334,24 @@ test("diagnostics reports reselect intent after reload", async () => {
     assert.match(output, /^boundary reason: reload$/m);
     assert.match(output, /^policy intent: reselect$/m);
     assert.match(output, /^active selection: openai-codex\/gpt-5\.5$/m);
+    assert.match(output, /^persisted selection: openai-codex\/gpt-5\.5$/m);
+    assert.match(output, /^warnings: \(none\)$/m);
+  });
+});
+
+test("diagnostics reports restore intent after resume", async () => {
+  await withHarness(async ({ handlers, commands, ctx, notifications }) => {
+    await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
+    notifications.length = 0;
+
+    await commands["model-router:diagnostics"].handler("", ctx);
+    const output = notifications.at(-1) ?? "";
+
+    assert.match(output, /^boundary reason: resume$/m);
+    assert.match(output, /^policy intent: restore$/m);
+    assert.match(output, /^active selection: stored\/model$/m);
+    assert.match(output, /^persisted selection: stored\/model$/m);
+    assert.match(output, /^warning: persisted model stored\/model is not in pool "main"$/m);
   });
 });
 
