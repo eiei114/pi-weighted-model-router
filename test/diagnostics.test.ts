@@ -91,3 +91,42 @@ test("buildDiagnosticsWarnings flags missing config and persisted selection", ()
   const warnings = buildDiagnosticsWarnings(ctx as never, {});
   assert.deepEqual(warnings, ["config missing or unreadable", "no persisted selection entry in session"]);
 });
+
+test("buildDiagnosticsWarnings flags active and persisted mismatch", () => {
+  const ctx = {
+    modelRegistry: {
+      find(provider: string, model: string) {
+        return { provider, model, input: ["text"] };
+      },
+    },
+  };
+  const config = {
+    version: 1 as const,
+    defaultPool: "main",
+    pools: {
+      main: { entries: [{ provider: "openai-codex", model: "gpt-5.5", weight: 1 }] },
+    },
+  };
+  const persisted = {
+    pool: "main",
+    provider: "openai-codex",
+    model: "gpt-5.5",
+    key: "openai-codex/gpt-5.5",
+    reason: "reload" as const,
+    selectedAt: "2026-05-29T00:00:00.000Z",
+    attemptedKeys: ["openai-codex/gpt-5.5"],
+    ledgerCommitted: false,
+  };
+  const selected = {
+    ...persisted,
+    provider: "cursor",
+    model: "gpt-5.5",
+    key: "cursor/gpt-5.5",
+    reason: "next" as const,
+  };
+
+  const warnings = buildDiagnosticsWarnings(ctx as never, { config, selected, persisted });
+  assert.deepEqual(warnings, [
+    "persisted selection (openai-codex/gpt-5.5) differs from active selection (cursor/gpt-5.5)",
+  ]);
+});

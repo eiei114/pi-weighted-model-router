@@ -124,6 +124,8 @@ Diagnostics is read-only. It reports the active session boundary reason, whether
 
 Use `/model-router:status` for day-to-day pool, model, and ledger counts. Use `/model-router:diagnostics` when startup, resume, reload, or fork behavior looks wrong. Use `/model-router:next` only when you intentionally want a new weighted selection in the current session.
 
+Before the first `session_start` in a process, or after `session_shutdown`, `boundary reason` and `policy intent` show `(none)` until the next boundary runs.
+
 Example after process startup or resume (restore intent):
 
 ```text
@@ -137,12 +139,25 @@ config: .pi/weighted-model-router/config.json
 
 Example after a new session or extension reload (reselect intent):
 
+After reselect completes, the router appends a fresh selection entry, so `active selection` and `persisted selection` normally match:
+
 ```text
 boundary reason: reload
 policy intent: reselect
-active selection: cursor/gpt-5.5
+active selection: openai-codex/gpt-5.5
 persisted selection: openai-codex/gpt-5.5
 warnings: (none)
+config: .pi/weighted-model-router/config.json
+```
+
+Example when persisted state is stale relative to the current config (restore path):
+
+```text
+boundary reason: startup
+policy intent: restore
+active selection: stored/model
+persisted selection: stored/model
+warning: persisted model stored/model is not in pool "main"
 config: .pi/weighted-model-router/config.json
 ```
 
