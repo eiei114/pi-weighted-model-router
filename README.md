@@ -43,7 +43,7 @@ pi install -l npm:pi-weighted-model-router
 Pin a specific version:
 
 ```bash
-pi install npm:pi-weighted-model-router@0.5.5
+pi install npm:pi-weighted-model-router@0.5.6
 ```
 
 From a local checkout:
