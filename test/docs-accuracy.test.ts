@@ -30,6 +30,11 @@ test("CHANGELOG documents the current package version", () => {
   );
 });
 
+test("README quick start uses the current install and command flow", () => {
+  assert.match(readme, /pi install npm:pi-weighted-model-router\r?\npi/);
+  assert.match(readme, /`\/model-router:configure`[\s\S]*?`\/model-router:status`/);
+});
+
 test("usage example entries match default config placeholders", () => {
   const entries = defaultConfig().pools.main.entries;
   for (const entry of entries) {
