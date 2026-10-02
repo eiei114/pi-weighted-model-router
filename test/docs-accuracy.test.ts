@@ -30,9 +30,26 @@ test("CHANGELOG documents the current package version", () => {
   );
 });
 
+/** Extract one level-2 section so assertions cannot pass on text from another section. */
+function readSection(markdown: string, heading: string): string {
+  const section = markdown
+    .replace(/\r\n/g, "\n")
+    .split(/^## /m)
+    .find((part) => part.startsWith(`${heading}\n`));
+  assert.ok(section, `README should include a "${heading}" section`);
+  return section;
+}
+
 test("README quick start uses the current install and command flow", () => {
-  assert.match(readme, /pi install npm:pi-weighted-model-router\r?\npi/);
-  assert.match(readme, /`\/model-router:configure`[\s\S]*?`\/model-router:status`/);
+  const quickStart = readSection(readme, "Quick start");
+  assert.match(quickStart, /pi install npm:pi-weighted-model-router\npi/);
+  const configureIndex = quickStart.indexOf("/model-router:configure");
+  const statusIndex = quickStart.indexOf("/model-router:status");
+  assert.ok(configureIndex >= 0, "Quick start should run /model-router:configure");
+  assert.ok(
+    statusIndex > configureIndex,
+    "Quick start should run /model-router:status after /model-router:configure",
+  );
 });
 
 test("usage example entries match default config placeholders", () => {
