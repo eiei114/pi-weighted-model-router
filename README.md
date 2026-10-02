@@ -61,9 +61,21 @@ pi -e /absolute/path/to/pi-weighted-model-router
 
 ## Quick start
 
-1. Install the package with one of the commands above.
-2. Start Pi and run `/model-router:configure` for guided weight setup, or edit config directly (see [docs/usage.md](docs/usage.md)).
-3. Check status with `/model-router:status`.
+Install the package, start Pi from the project where you want to use it, and run the guided setup inside the Pi prompt:
+
+```bash
+pi install npm:pi-weighted-model-router
+pi
+```
+
+Then run:
+
+```text
+/model-router:configure
+/model-router:status
+```
+
+`/model-router:configure` asks for provider/model entries and weights, then saves the config after confirmation. To edit the JSON directly instead, see [docs/usage.md](docs/usage.md).
 
 Config paths:
 
