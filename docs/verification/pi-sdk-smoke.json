@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "verification_contract": "pi-sdk-behavior-v2",
+  "sdk_versions": {
+    "@earendil-works/pi-agent-core": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@earendil-works/pi-tui": "1.1.0"
+  },
+  "platform": "win32",
+  "model_inference": "none; actual Pi host, router extension, local deterministic provider registration, and RPC feature command",
+  "unhandled_errors": 0,
+  "extension_load_errors": 0,
+  "cases": [
+    {
+      "name": "extension_load",
+      "command": "npm run smoke:pi",
+      "exit_code": 0,
+      "passed": true,
+      "evidence": "{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\",\"statusText\":\"router:main pi-sdk-smoke/router-model [initial]\"}\n{\"type\":\"response\",\"command\":\"get_commands\",\"success\":true,\"data\":{\"commands\":[{\"name\":\"model-router\",\"description\":\"Legacy model router command. Prefer colon commands such as /model-router:status.\",\"source\":\"extension\",\"sourceInfo\":{\"path\":\"<checkout>\\\\src\\\\index.ts\",\"source\":\"cli\",\"scope\":\"temporary\",\"origin\":\"top-level\"}},{\"name\":\"model-router:status\",\"description\":\"Model router: show current router status.\",\"source\":\"extension\",\"sourceInfo\":{\"path\":\"<checkout>\\\\src\\\\index.ts\",\"source\":\"cli\",\"scope\":\"temporary\",\"origin\":\"top-level\"}},{\"name\":\"model-router:diagnostics\",\"description\":\"Model router: show boundary policy and persisted state diagnostics.\",\"source\":\"extension\",\"sourceInfo\":{\"path\":\"<checkout>\\\\src\\\\index.ts\",\"source\":\"cli\",\"scope\":\"temporary\",\"origin\":\"top-level\"}},{\"name\":\"model-router:next\",\"description\":\"Model router: reselect the next weighted model in this session.\",\"source\":\"extension\",\"sourceInfo\":{\"path\":\"<checkout>\\\\src\\\\index.ts\",\"source\":\"cli\",\"scope\":\"temporary\",\"origin\":\"top-level\"}},{\"name\":\"model-router:configure\",\"description\":\"Model router: start guided model weight setup.\",\"source\":\"extension\",\"sourceInfo\":{\"path\":\"<checkout>\\\\src\\\\index.ts\",\"source\":\"cli\",\"scope\":\"temporary\",\"origin\":\"top-level\"}}]}}\n{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\"}\n",
+      "assertions": [
+        {
+          "id": "extension_registered",
+          "expected": "Pi 1.1.0 loaded the router, registered its command, and selected the configured model",
+          "observed": "{\"status\":{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\",\"statusText\":\"router:main pi-sdk-smoke/router-model [initial]\"},\"registered\":true}",
+          "passed": true
+        },
+        {
+          "id": "process_exit",
+          "expected": "The bounded child process exits with code 0 and no signal",
+          "observed": "{\"exitCode\":0,\"signal\":null}",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "happy_path",
+      "command": "npm run smoke:pi",
+      "exit_code": 0,
+      "passed": true,
+      "evidence": "{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\",\"statusText\":\"router:main pi-sdk-smoke/router-model [initial]\"}\n{\"type\":\"response\",\"command\":\"prompt\",\"success\":true,\"data\":{\"disposition\":\"handled\"}}\n{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"notify\",\"message\":\"boundary reason: initial\\npolicy intent: n/a (manual or runtime trigger)\\nactive selection: pi-sdk-smoke/router-model\\npersisted selection: pi-sdk-smoke/router-model\\nwarnings: (none)\\nconfig: <isolated-pi-dir>\\\\weighted-model-router\\\\config.json\",\"notifyType\":\"info\"}\n{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\"}\n",
+      "assertions": [
+        {
+          "id": "feature_response",
+          "expected": "The real diagnostics command returns handled output for the selected model",
+          "observed": "{\"prompt\":{\"type\":\"response\",\"command\":\"prompt\",\"success\":true,\"data\":{\"disposition\":\"handled\"}},\"message\":\"boundary reason: initial\\npolicy intent: n/a (manual or runtime trigger)\\nactive selection: pi-sdk-smoke/router-model\\npersisted selection: pi-sdk-smoke/router-model\\nwarnings: (none)\\nconfig: <isolated-pi-dir>\\\\weighted-model-router\\\\config.json\"}",
+          "passed": true
+        },
+        {
+          "id": "process_exit",
+          "expected": "The bounded child process exits with code 0 and no signal",
+          "observed": "{\"exitCode\":0,\"signal\":null}",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "error_path",
+      "command": "npm run smoke:pi",
+      "exit_code": 0,
+      "passed": true,
+      "evidence": "{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"notify\",\"message\":\"Model router config error: Pool \\\"main\\\" entry 0 weight must be a positive number.\",\"notifyType\":\"warning\"}\n{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"notify\",\"message\":\"Model router config error: Pool \\\"main\\\" entry 0 weight must be a positive number.\",\"notifyType\":\"warning\"}\n{\"type\":\"response\",\"command\":\"get_state\",\"success\":true,\"data\":{\"model\":{\"id\":\"router-model\",\"name\":\"Router smoke model\",\"input\":[\"text\"],\"cost\":{\"input\":0,\"output\":0,\"cacheRead\":0,\"cacheWrite\":0},\"contextWindow\":4096,\"maxTokens\":512,\"api\":\"openai-completions\",\"provider\":\"pi-sdk-smoke\",\"baseUrl\":\"http://127.0.0.1:1\"},\"thinkingLevel\":\"off\",\"isStreaming\":false,\"isCompacting\":false,\"steeringMode\":\"one-at-a-time\",\"followUpMode\":\"one-at-a-time\",\"sessionId\":\"<session-id>\",\"autoCompactionEnabled\":true,\"messageCount\":0,\"pendingMessageCount\":0}}\n{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\"}\n",
+      "assertions": [
+        {
+          "id": "handled_error",
+          "expected": "An invalid pool weight is reported as a handled router config warning",
+          "observed": "\"Model router config error: Pool \\\"main\\\" entry 0 weight must be a positive number.\"",
+          "passed": true
+        },
+        {
+          "id": "process_exit",
+          "expected": "The bounded child process exits with code 0 and no signal",
+          "observed": "{\"exitCode\":0,\"signal\":null}",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "reload_cleanup",
+      "command": "npm run smoke:pi",
+      "exit_code": 0,
+      "passed": true,
+      "evidence": "{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\",\"statusText\":\"router:main pi-sdk-smoke/router-model [initial]\"}\n{\"type\":\"response\",\"command\":\"prompt\",\"success\":true,\"data\":{\"disposition\":\"handled\"}}\n{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"notify\",\"message\":\"boundary reason: initial\\npolicy intent: n/a (manual or runtime trigger)\\nactive selection: pi-sdk-smoke/router-model\\npersisted selection: pi-sdk-smoke/router-model\\nwarnings: (none)\\nconfig: <isolated-pi-dir>\\\\weighted-model-router\\\\config.json\",\"notifyType\":\"info\"}\n{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\"}\n",
+      "assertions": [
+        {
+          "id": "reloaded_extension_registered",
+          "expected": "A second isolated Pi host loads the router and selects the configured model",
+          "observed": "{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\",\"statusText\":\"router:main pi-sdk-smoke/router-model [initial]\"}",
+          "passed": true
+        },
+        {
+          "id": "reloaded_feature_response",
+          "expected": "The second host handles diagnostics and reports the selected model",
+          "observed": "{\"prompt\":{\"type\":\"response\",\"command\":\"prompt\",\"success\":true,\"data\":{\"disposition\":\"handled\"}},\"message\":\"boundary reason: initial\\npolicy intent: n/a (manual or runtime trigger)\\nactive selection: pi-sdk-smoke/router-model\\npersisted selection: pi-sdk-smoke/router-model\\nwarnings: (none)\\nconfig: <isolated-pi-dir>\\\\weighted-model-router\\\\config.json\"}",
+          "passed": true
+        },
+        {
+          "id": "clean_shutdown",
+          "expected": "The actual second Pi process exits cleanly without unhandled or shutdown errors",
+          "observed": "{\"exitCode\":0,\"errors\":false}",
+          "passed": true
+        },
+        {
+          "id": "process_exit",
+          "expected": "The bounded child process exits with code 0 and no signal",
+          "observed": "{\"exitCode\":0,\"signal\":null}",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "host_shell",
+      "command": "npm run smoke:pi",
+      "exit_code": 0,
+      "passed": true,
+      "evidence": "1.1.0\n",
+      "assertions": [
+        {
+          "id": "native_shell_boundary",
+          "expected": "Native host shell launches the checkout's pinned Pi CLI",
+          "observed": "{\"exitCode\":0,\"output\":\"1.1.0\",\"expectedVersion\":\"1.1.0\"}",
+          "passed": true
+        },
+        {
+          "id": "process_exit",
+          "expected": "The bounded child process exits with code 0 and no signal",
+          "observed": "{\"exitCode\":0,\"signal\":null}",
+          "passed": true
+        }
+      ]
+    }
+  ]
+}
