@@ -1,8 +1,7 @@
 name: Auto Release
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   actions: write
@@ -11,6 +10,7 @@ permissions:
 jobs:
   release:
     name: Create release for new version
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
