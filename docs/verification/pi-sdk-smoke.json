@@ -26,6 +26,18 @@
           "passed": true
         },
         {
+          "id": "rpc_stdout_jsonl",
+          "expected": "Every nonempty Pi RPC stdout line is valid JSON",
+          "observed": "null",
+          "passed": true
+        },
+        {
+          "id": "stdin_write",
+          "expected": "Pi accepts the smoke RPC input without a stream error",
+          "observed": "null",
+          "passed": true
+        },
+        {
           "id": "process_exit",
           "expected": "The bounded child process exits with code 0 and no signal",
           "observed": "{\"exitCode\":0,\"signal\":null}",
@@ -47,6 +59,18 @@
           "passed": true
         },
         {
+          "id": "rpc_stdout_jsonl",
+          "expected": "Every nonempty Pi RPC stdout line is valid JSON",
+          "observed": "null",
+          "passed": true
+        },
+        {
+          "id": "stdin_write",
+          "expected": "Pi accepts the smoke RPC input without a stream error",
+          "observed": "null",
+          "passed": true
+        },
+        {
           "id": "process_exit",
           "expected": "The bounded child process exits with code 0 and no signal",
           "observed": "{\"exitCode\":0,\"signal\":null}",
@@ -65,6 +89,18 @@
           "id": "handled_error",
           "expected": "An invalid pool weight is reported as a handled router config warning",
           "observed": "\"Model router config error: Pool \\\"main\\\" entry 0 weight must be a positive number.\"",
+          "passed": true
+        },
+        {
+          "id": "rpc_stdout_jsonl",
+          "expected": "Every nonempty Pi RPC stdout line is valid JSON",
+          "observed": "null",
+          "passed": true
+        },
+        {
+          "id": "stdin_write",
+          "expected": "Pi accepts the smoke RPC input without a stream error",
+          "observed": "null",
           "passed": true
         },
         {
@@ -101,6 +137,18 @@
           "passed": true
         },
         {
+          "id": "rpc_stdout_jsonl",
+          "expected": "Every nonempty Pi RPC stdout line is valid JSON",
+          "observed": "null",
+          "passed": true
+        },
+        {
+          "id": "stdin_write",
+          "expected": "Pi accepts the smoke RPC input without a stream error",
+          "observed": "null",
+          "passed": true
+        },
+        {
           "id": "process_exit",
           "expected": "The bounded child process exits with code 0 and no signal",
           "observed": "{\"exitCode\":0,\"signal\":null}",
@@ -119,6 +167,18 @@
           "id": "native_shell_boundary",
           "expected": "Native host shell launches the checkout's pinned Pi CLI",
           "observed": "{\"exitCode\":0,\"output\":\"1.1.0\",\"expectedVersion\":\"1.1.0\"}",
+          "passed": true
+        },
+        {
+          "id": "rpc_stdout_jsonl",
+          "expected": "Every nonempty Pi RPC stdout line is valid JSON",
+          "observed": "null",
+          "passed": true
+        },
+        {
+          "id": "stdin_write",
+          "expected": "Pi accepts the smoke RPC input without a stream error",
+          "observed": "null",
           "passed": true
         },
         {

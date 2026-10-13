@@ -8,19 +8,46 @@ export const SDK_NAMES = [
 export const UNHANDLED_ERROR_PATTERN = /UnhandledPromiseRejection|uncaught exception|shutdown error/i;
 export const EXTENSION_LOAD_ERROR_PATTERN = /Failed to load extension|Error loading extension|extension_error/i;
 
-export function parseJsonLines(output) {
-  return output.split(/\r?\n/).flatMap((line) => {
+export function parseJsonLines(output, { allowIncompleteTail = false } = {}) {
+  const lines = output.split(/\r?\n/);
+  if (allowIncompleteTail && !output.endsWith("\n")) lines.pop();
+  return lines.flatMap((line) => {
     if (!line.trim()) return [];
     try {
       return [JSON.parse(line)];
-    } catch {
-      return [];
+    } catch (error) {
+      throw new Error(`Invalid JSONL record: ${line}`, { cause: error });
     }
   });
 }
 
+export function writeStdin(stream, input) {
+  let writeError;
+  stream.on("error", (error) => { writeError ??= error; });
+  try {
+    stream.write(input);
+  } catch (error) {
+    writeError ??= error;
+  }
+  return () => {
+    if (!writeError) return undefined;
+    const code = writeError.code ? `${writeError.code}: ` : "";
+    return `${code}${writeError.message ?? String(writeError)}`;
+  };
+}
+
 function assertion(id, expected, observed, passed) {
   return { id, expected, observed: JSON.stringify(observed), passed: passed === true };
+}
+
+export function stdinWriteAssertion(error) {
+  return assertion("stdin_write", "Pi accepts the smoke RPC input without a stream error",
+    error ?? null, !error);
+}
+
+export function rpcStdoutAssertion(error) {
+  return assertion("rpc_stdout_jsonl", "Every nonempty Pi RPC stdout line is valid JSON",
+    error ?? null, !error);
 }
 
 function statusFor(responses) {

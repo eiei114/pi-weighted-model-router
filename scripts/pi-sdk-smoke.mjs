@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import {
   behaviorAssertions, EXTENSION_LOAD_ERROR_PATTERN, parseJsonLines, SDK_NAMES,
-  UNHANDLED_ERROR_PATTERN, VERIFICATION_CONTRACT,
+  rpcStdoutAssertion, stdinWriteAssertion, UNHANDLED_ERROR_PATTERN, VERIFICATION_CONTRACT, writeStdin,
 } from "./pi-sdk-smoke-contract.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -59,6 +59,7 @@ function runPi(agentDir, input, isComplete) {
     let outputTooLarge = false;
     let inputEnded = false;
     let deadlineExpired = false;
+    let stdoutParseError;
     let completionTimer;
     const responses = [];
     const stop = setTimeout(() => {
@@ -72,7 +73,13 @@ function runPi(agentDir, input, isComplete) {
         child.kill();
         return;
       }
-      responses.splice(0, responses.length, ...parseJsonLines(stdout), ...parseJsonLines(stderr));
+      try {
+        responses.splice(0, responses.length, ...parseJsonLines(stdout, { allowIncompleteTail: true }));
+      } catch (error) {
+        stdoutParseError = error.message;
+        child.kill();
+        return;
+      }
       if (!inputEnded && isComplete(responses)) {
         inputEnded = true;
         child.stdin.end();
@@ -96,18 +103,23 @@ function runPi(agentDir, input, isComplete) {
       clearTimeout(stop);
       clearTimeout(completionTimer);
       resolveResult({ exitCode: 1, signal: null, fullOutput: `${stdout}${stderr}`, responses, agentDir,
-        spawnError: error.message });
+        spawnError: error.message, stdoutParseError, stdinError: getStdinError() });
     });
     child.on("close", (code, signal) => {
       clearTimeout(stop);
       clearTimeout(completionTimer);
       const fullOutput = `${stdout}${stderr}`;
-      responses.splice(0, responses.length, ...parseJsonLines(stdout), ...parseJsonLines(stderr));
+      try {
+        responses.splice(0, responses.length, ...parseJsonLines(stdout));
+      } catch (error) {
+        stdoutParseError ??= error.message;
+      }
       resolveResult({ exitCode: code ?? 1, signal, fullOutput, responses, agentDir,
         spawnError: outputTooLarge ? "output exceeded bounded 64 KB limit"
-          : deadlineExpired ? "Pi process exceeded the 15 second response or 1 second cleanup deadline" : undefined });
+          : deadlineExpired ? "Pi process exceeded the 15 second response or 1 second cleanup deadline" : undefined,
+        stdoutParseError, stdinError: getStdinError() });
     });
-    child.stdin.write(input);
+    const getStdinError = writeStdin(child.stdin, input);
   });
 }
 
@@ -122,6 +134,8 @@ function caseResult(name, execution, expectedVersion) {
     assertions.push({ id: "process_started", expected: "Pi host starts and exits before the 15 second deadline",
       observed: JSON.stringify(execution.spawnError), passed: false });
   }
+  assertions.push(rpcStdoutAssertion(execution.stdoutParseError));
+  assertions.push(stdinWriteAssertion(execution.stdinError));
   assertions.push({ id: "process_exit", expected: "The bounded child process exits with code 0 and no signal",
     observed: JSON.stringify({ exitCode: execution.exitCode, signal: execution.signal ?? null }),
     passed: execution.exitCode === 0 && !execution.signal });
