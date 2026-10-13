@@ -8,7 +8,9 @@ import {
 } from "./pi-sdk-smoke-contract.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const reportPath = resolve(root, "docs/verification/pi-sdk-smoke.json");
+const reportPath = process.argv.includes("--update-curated-report")
+  ? resolve(root, "docs/verification/pi-sdk-smoke.json")
+  : resolve(root, ".tmp/pi-sdk-smoke.json");
 const manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const sdkVersions = Object.fromEntries(SDK_NAMES.map((name) => {
   const installed = JSON.parse(readFileSync(resolve(root, "node_modules", name, "package.json"), "utf8")).version;
