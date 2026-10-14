@@ -1,6 +1,6 @@
 {
   "name": "pi-weighted-model-router",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Pi extension that balances model/provider usage across weighted model pools.",
   "type": "module",
   "license": "MIT",
@@ -31,9 +31,10 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"test/**/*.test.ts\"",
-    "check": "npm run typecheck && npm test && npm run release:npm:dry",
+    "test": "node --import tsx --test \"test/**/*.test.ts\" \"test/**/*.test.mjs\"",
+    "check": "npm run typecheck && npm test && npm run smoke:pi && npm run release:npm:dry",
     "release:npm:dry": "npm pack --dry-run",
+    "smoke:pi": "node scripts/pi-sdk-smoke.mjs",
     "prepublishOnly": "npm run check",
     "version:check": "node scripts/check-version-bump.mjs"
   },
@@ -49,9 +50,10 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.99.1",
-    "@earendil-works/pi-coding-agent": "^0.99.1",
-    "@earendil-works/pi-tui": "^0.99.1",
+    "@earendil-works/pi-agent-core": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@earendil-works/pi-tui": "1.1.0",
     "@types/node": "^26.1.1",
     "tsx": "^4.22.3",
     "typebox": "^1.1.38",
