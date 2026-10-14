@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   behaviorAssertions, parseJsonLines, rpcStdoutAssertion, stdinWriteAssertion, writeStdin,
@@ -123,4 +124,15 @@ test("early child close records a stdin stream failure in its case assertion", a
   const assertion = stdinWriteAssertion(streamError);
   assert.equal(assertion.id, "stdin_write");
   assert.equal(assertion.passed, false);
+});
+
+
+test("host_shell must not report RPC transport assertions it never ran", () => {
+  const source = readFileSync(new URL("../scripts/pi-sdk-smoke.mjs", import.meta.url), "utf8");
+  assert.match(source, /if \(name !== "host_shell"\) \{/, "RPC assertions must be limited to RPC cases");
+  const report = JSON.parse(readFileSync(new URL("../docs/verification/pi-sdk-smoke.json", import.meta.url), "utf8"));
+  const hostShell = report.cases.find((entry) => entry.name === "host_shell");
+  const ids = hostShell.assertions.map((entry) => entry.id);
+  assert.deepEqual(ids, ["native_shell_boundary", "process_exit"]);
+  assert.ok(!ids.includes("rpc_stdout_jsonl") && !ids.includes("stdin_write"));
 });

@@ -136,8 +136,13 @@ function caseResult(name, execution, expectedVersion) {
     assertions.push({ id: "process_started", expected: "Pi host starts and exits before the 15 second deadline",
       observed: JSON.stringify(execution.spawnError), passed: false });
   }
-  assertions.push(rpcStdoutAssertion(execution.stdoutParseError));
-  assertions.push(stdinWriteAssertion(execution.stdinError));
+  // RPC transport assertions apply only to the cases that actually speak the
+  // JSONL RPC protocol. host_shell runs the CLI --version command and has no
+  // RPC stream, so claiming these there would report checks that never ran.
+  if (name !== "host_shell") {
+    assertions.push(rpcStdoutAssertion(execution.stdoutParseError));
+    assertions.push(stdinWriteAssertion(execution.stdinError));
+  }
   assertions.push({ id: "process_exit", expected: "The bounded child process exits with code 0 and no signal",
     observed: JSON.stringify({ exitCode: execution.exitCode, signal: execution.signal ?? null }),
     passed: execution.exitCode === 0 && !execution.signal });

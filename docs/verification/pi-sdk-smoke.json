@@ -170,18 +170,6 @@
           "passed": true
         },
         {
-          "id": "rpc_stdout_jsonl",
-          "expected": "Every nonempty Pi RPC stdout line is valid JSON",
-          "observed": "null",
-          "passed": true
-        },
-        {
-          "id": "stdin_write",
-          "expected": "Pi accepts the smoke RPC input without a stream error",
-          "observed": "null",
-          "passed": true
-        },
-        {
           "id": "process_exit",
           "expected": "The bounded child process exits with code 0 and no signal",
           "observed": "{\"exitCode\":0,\"signal\":null}",
