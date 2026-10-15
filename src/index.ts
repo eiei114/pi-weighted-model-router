@@ -328,7 +328,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
   pi.on("before_agent_start", async (event, ctx) => {
     await runSerialized(async () => {
-      requiredInputs = event.images && event.images.length > 0 ? ["image"] : [];
+      requiredInputs = event.messageType === "user" && (event.images?.length ?? 0) > 0 ? ["image"] : [];
       if (!(await ensureRuntime(ctx))) return;
 
       if (!selected) {

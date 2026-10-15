@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.8] - 2026-10-16
+
+### Changed
+
+- Update the Pi SDK dev/test dependencies to 1.2.0 and handle custom `before_agent_start` events.
+
 ## [0.5.7] - 2026-10-12
 
 ### Changed

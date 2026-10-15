@@ -49,9 +49,9 @@ test("reload assertions require the second-host feature response and a clean pro
 });
 
 test("host-shell assertion compares the actual complete version rather than command success alone", () => {
-  const assertions = behaviorAssertions("host_shell", { responses: [], fullOutput: "1.1.0\n", expectedVersion: "1.1.0", exitCode: 0 });
+  const assertions = behaviorAssertions("host_shell", { responses: [], fullOutput: "1.2.0\n", expectedVersion: "1.2.0", exitCode: 0 });
   assert.equal(assertions[0].passed, true);
-  assert.equal(behaviorAssertions("host_shell", { responses: [], fullOutput: "1.1.1\n", expectedVersion: "1.1.0", exitCode: 0 })[0].passed, false);
+  assert.equal(behaviorAssertions("host_shell", { responses: [], fullOutput: "1.2.1\n", expectedVersion: "1.2.0", exitCode: 0 })[0].passed, false);
 });
 
 test("JSONL parser rejects malformed records and defers an incomplete stdout tail", () => {
