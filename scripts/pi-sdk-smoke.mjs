@@ -14,7 +14,7 @@ const reportPath = process.argv.includes("--update-curated-report")
 const manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const sdkVersions = Object.fromEntries(SDK_NAMES.map((name) => {
   const installed = JSON.parse(readFileSync(resolve(root, "node_modules", name, "package.json"), "utf8")).version;
-  if (manifest.devDependencies?.[name] !== installed || installed !== "1.1.0") {
+  if (manifest.devDependencies?.[name] !== installed || installed !== "1.2.0") {
     throw new Error(`Smoke requires the frozen exact SDK pin for ${name}; manifest=${manifest.devDependencies?.[name]}, installed=${installed}`);
   }
   return [name, installed];
@@ -196,26 +196,26 @@ try {
   const extensionLoad = caseResult("extension_load", await runPi(agentDir,
     rpcInput("get_commands"), (responses) => responses.some((row) => row?.command === "get_commands")
       && !!responses.find((row) => row?.type === "extension_ui_request" && row.method === "setStatus"
-        && typeof row.statusText === "string" && row.statusText.includes("pi-sdk-smoke/router-model"))), "1.1.0");
+        && typeof row.statusText === "string" && row.statusText.includes("pi-sdk-smoke/router-model"))), "1.2.0");
   const isFeatureComplete = (responses) => responses.some((row) => row?.type === "response"
     && row.command === "prompt" && row.success === true && row.data?.disposition === "handled")
     && responses.some((row) => row?.type === "extension_ui_request" && row.method === "notify"
       && typeof row.message === "string" && row.message.includes("active selection: pi-sdk-smoke/router-model"));
   const happyPath = caseResult("happy_path", await runPi(agentDir,
-    rpcInput("prompt", "?router-diagnostics-smoke"), isFeatureComplete), "1.1.0");
+    rpcInput("prompt", "?router-diagnostics-smoke"), isFeatureComplete), "1.2.0");
   const errorDir = makeFixture(true);
   let errorPath;
   try {
     errorPath = caseResult("error_path", await runPi(errorDir, rpcInput("get_state"), (responses) =>
       responses.some((row) => row?.command === "get_state") && responses.some((row) => row?.type === "extension_ui_request"
-        && row.method === "notify" && typeof row.message === "string" && row.message.includes("Model router config error:"))), "1.1.0");
+        && row.method === "notify" && typeof row.message === "string" && row.message.includes("Model router config error:"))), "1.2.0");
   } finally {
     rmSync(errorDir, { recursive: true, force: true });
   }
   // A second actual Pi process against the same isolated state exercises reload/restart cleanup.
   const reloadOutput = await runPi(agentDir, rpcInput("prompt", "?router-diagnostics-smoke"), isFeatureComplete);
-  const reloadCleanup = caseResult("reload_cleanup", reloadOutput, "1.1.0");
-  const cases = [extensionLoad, happyPath, errorPath, reloadCleanup, runHostShell("1.1.0")];
+  const reloadCleanup = caseResult("reload_cleanup", reloadOutput, "1.2.0");
+  const cases = [extensionLoad, happyPath, errorPath, reloadCleanup, runHostShell("1.2.0")];
   const report = {
     schema_version: 1,
     verification_contract: VERIFICATION_CONTRACT,

@@ -2,10 +2,10 @@
   "schema_version": 1,
   "verification_contract": "pi-sdk-behavior-v2",
   "sdk_versions": {
-    "@earendil-works/pi-agent-core": "1.1.0",
-    "@earendil-works/pi-ai": "1.1.0",
-    "@earendil-works/pi-coding-agent": "1.1.0",
-    "@earendil-works/pi-tui": "1.1.0"
+    "@earendil-works/pi-agent-core": "1.2.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-coding-agent": "1.2.0",
+    "@earendil-works/pi-tui": "1.2.0"
   },
   "platform": "win32",
   "model_inference": "none; actual Pi host, router extension, local deterministic provider registration, and RPC feature command",
@@ -21,7 +21,7 @@
       "assertions": [
         {
           "id": "extension_registered",
-          "expected": "Pi 1.1.0 loaded the router, registered its command, and selected the configured model",
+          "expected": "Pi 1.2.0 loaded the router, registered its command, and selected the configured model",
           "observed": "{\"status\":{\"type\":\"extension_ui_request\",\"id\":\"<opaque-id>\",\"method\":\"setStatus\",\"statusKey\":\"model-router\",\"statusText\":\"router:main pi-sdk-smoke/router-model [initial]\"},\"registered\":true}",
           "passed": true
         },
@@ -161,12 +161,12 @@
       "command": "npm run smoke:pi",
       "exit_code": 0,
       "passed": true,
-      "evidence": "1.1.0\n",
+      "evidence": "1.2.0\n",
       "assertions": [
         {
           "id": "native_shell_boundary",
           "expected": "Native host shell launches the checkout's pinned Pi CLI",
-          "observed": "{\"exitCode\":0,\"output\":\"1.1.0\",\"expectedVersion\":\"1.1.0\"}",
+          "observed": "{\"exitCode\":0,\"output\":\"1.2.0\",\"expectedVersion\":\"1.2.0\"}",
           "passed": true
         },
         {

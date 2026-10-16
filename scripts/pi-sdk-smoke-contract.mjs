@@ -70,7 +70,7 @@ export function behaviorAssertions(name, { responses, fullOutput, exitCode, expe
     const commands = commandResponse?.data?.commands;
     const status = statusFor(responses);
     const registered = Array.isArray(commands) && commands.some((command) => command.name === "model-router:diagnostics");
-    return [assertion("extension_registered", "Pi 1.1.0 loaded the router, registered its command, and selected the configured model",
+    return [assertion("extension_registered", "Pi 1.2.0 loaded the router, registered its command, and selected the configured model",
       { status: status ?? null, registered }, !!status && registered)];
   }
   if (name === "happy_path") {
