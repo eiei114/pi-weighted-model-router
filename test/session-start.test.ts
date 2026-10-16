@@ -419,6 +419,34 @@ test("before_agent_start reselects when selected model lacks image capability", 
   });
 });
 
+test("before_agent_start preserves image detection for legacy events without messageType", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended }) => {
+    await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
+    setModels.length = 0;
+    appended.length = 0;
+
+    await handlers.before_agent_start({ type: "before_agent_start", images: [{ id: "img-legacy" }] }, ctx);
+
+    assert.deepEqual(setModels, ["cursor/gpt-5.5"]);
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0].data.reason, "capability");
+    assert.equal(appended[0].data.provider, "cursor");
+  });
+});
+
+test("before_agent_start does not require image capability when a user event has no images", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended }) => {
+    await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
+    setModels.length = 0;
+    appended.length = 0;
+
+    await handlers.before_agent_start({ type: "before_agent_start", messageType: "user", images: [] }, ctx);
+
+    assert.deepEqual(setModels, []);
+    assert.equal(appended.length, 0);
+  });
+});
+
 test("before_agent_start ignores custom messages when detecting image inputs", async () => {
   await withHarness(async ({ handlers, ctx, setModels, appended }) => {
     await handlers.session_start({ type: "session_start", reason: "resume" }, ctx);
@@ -426,6 +454,16 @@ test("before_agent_start ignores custom messages when detecting image inputs", a
     appended.length = 0;
 
     await handlers.before_agent_start({ type: "before_agent_start", messageType: "custom", message: "extension-triggered" }, ctx);
+
+    assert.deepEqual(setModels, []);
+    assert.equal(appended.length, 0);
+
+    await handlers.before_agent_start({
+      type: "before_agent_start",
+      messageType: "custom",
+      message: "extension-triggered",
+      images: [{ id: "img-custom" }],
+    }, ctx);
 
     assert.deepEqual(setModels, []);
     assert.equal(appended.length, 0);
@@ -636,7 +674,8 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
       session_shutdown: (event: { type: "session_shutdown" }, ctx: any) => Promise<void> | void;
       before_agent_start: (event:
         | { type: "before_agent_start"; messageType: "user"; images: unknown[] }
-        | { type: "before_agent_start"; messageType: "custom"; message: string }, ctx: any) => Promise<void>;
+        | { type: "before_agent_start"; images: unknown[] }
+        | { type: "before_agent_start"; messageType: "custom"; message: string; images?: unknown[] }, ctx: any) => Promise<void>;
       after_provider_response: (event: { type: "after_provider_response"; status: number; headers: Record<string, string> }, ctx: any) => Promise<void>;
     },
     ctx,
