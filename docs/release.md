@@ -19,7 +19,7 @@ npm version patch
 git push
 ```
 
-On `main`, `.github/workflows/auto-release.yml` checks `package.json` version. If `v<version>` does not exist yet, it creates the tag, creates the GitHub Release, then explicitly dispatches `.github/workflows/publish.yml` for that tag.
+Merging a version bump does not publish. After merge, a maintainer dispatches `.github/workflows/auto-release.yml` on `main` with `release_authorized` checked. It checks `package.json` version against the latest stable release tag; when the version is newer and `v<version>` does not exist yet, it creates the tag, creates the GitHub Release, then explicitly dispatches `.github/workflows/publish.yml` for that tag.
 
 The `v*.*.*` tag also triggers `.github/workflows/publish.yml`, which runs CI and publishes to npm when tags are pushed manually. Publishing also runs when a GitHub Release is published, and can be run manually from GitHub Actions with `workflow_dispatch`.
 
@@ -29,7 +29,7 @@ The workflow skips `name@version` if that exact package version already exists o
 
 Do not ship a new version bump with only `package.json` changes. The repository must include the release workflow pair:
 
-- `.github/workflows/auto-release.yml` creates `v<version>` tags and GitHub Releases from `main` version bumps.
+- `.github/workflows/auto-release.yml` creates `v<version>` tags and GitHub Releases from an explicit `workflow_dispatch` on `main`. It has no `push` trigger, so merges run CI only.
 - `.github/workflows/publish.yml` publishes to npm through Trusted Publishing.
 
 Important: tags or releases created by `GITHUB_TOKEN` do not reliably fan out into another workflow through normal `push.tags` or `release.published` triggers. `auto-release.yml` explicitly dispatches `publish.yml` after creating the tag/release.

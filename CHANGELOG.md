@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.9] - 2026-10-20
+
+### Fixed
+
+- Remove the duplicate `if:` key on the release job so GitHub can parse and dispatch `auto-release.yml` again. Releases stay behind the manual `workflow_dispatch` authorization and do not run on merge.
+
 ## [0.5.8] - 2026-10-16
 
 ### Changed
