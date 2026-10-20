@@ -43,7 +43,7 @@ pi install -l npm:pi-weighted-model-router
 Pin a specific version:
 
 ```bash
-pi install npm:pi-weighted-model-router@0.5.8
+pi install npm:pi-weighted-model-router@0.5.9
 ```
 
 From a local checkout:
@@ -126,7 +126,7 @@ npm version patch
 git push
 ```
 
-On `main`, `.github/workflows/auto-release.yml` creates the `v<version>` tag and GitHub Release, then dispatches `.github/workflows/publish.yml` to publish to npm.
+Merging does not publish. After merge, a maintainer dispatches `.github/workflows/auto-release.yml` on `main` with `release_authorized` checked; it creates the `v<version>` tag and GitHub Release, then dispatches `.github/workflows/publish.yml` to publish to npm.
 
 See [docs/release.md](docs/release.md) for setup details.
 
