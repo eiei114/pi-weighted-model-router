@@ -216,7 +216,8 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
 
   function restoreSelection(ctx: ExtensionContext): SelectedModel | undefined {
     const entries = ctx.sessionManager.getEntries() as Array<{ type?: string; customType?: string; data?: unknown }>;
-    for (const entry of [...entries].reverse()) {
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const entry = entries[index];
       if (entry.type !== "custom" || entry.customType !== SELECTION_ENTRY) continue;
       const parsed = parseSelectedModel(entry.data);
       if (parsed) return parsed;
