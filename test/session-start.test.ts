@@ -21,6 +21,44 @@ test("session_start startup restores stored entry", async () => {
   });
 });
 
+test("session_start restore chooses the newest saved selection in session history", async () => {
+  const olderSelection = {
+    pool: "main",
+    provider: "stored",
+    model: "model",
+    key: "stored/model",
+    reason: "initial",
+    selectedAt: "2026-05-29T00:00:00.000Z",
+    attemptedKeys: ["stored/model"],
+    ledgerCommitted: false,
+  };
+  const newestSelection = {
+    pool: "main",
+    provider: "cursor",
+    model: "gpt-5.5",
+    key: "cursor/gpt-5.5",
+    reason: "resume",
+    selectedAt: "2026-05-30T00:00:00.000Z",
+    attemptedKeys: ["cursor/gpt-5.5"],
+    ledgerCommitted: true,
+  };
+
+  await withHarness(async ({ handlers, ctx, setModels }) => {
+    const entries: Array<{ type: string; customType: string; data: unknown }> = Array.from({ length: 5_000 }, (_, index) => ({
+      type: "message",
+      customType: "",
+      data: index,
+    }));
+    entries[0] = { type: "custom", customType: SELECTION_ENTRY, data: olderSelection };
+    entries[entries.length - 1] = { type: "custom", customType: SELECTION_ENTRY, data: newestSelection };
+    ctx.sessionManager.getEntries = () => entries;
+
+    await handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
+
+    assert.deepEqual(setModels, ["cursor/gpt-5.5"]);
+  });
+});
+
 test("session_start reload ignores stored entry and reselects", async () => {
   await withHarness(async ({ handlers, ctx, setModels, appended, notifications, statuses }) => {
     await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);

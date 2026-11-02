@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.10] - 2026-11-02
+
+### Changed
+
+- Restore the latest saved selection by scanning session history backward without copying the full entry list.
+
 ## [0.5.9] - 2026-10-20
 
 ### Fixed
