@@ -12,13 +12,21 @@ const reportPath = process.argv.includes("--update-curated-report")
   ? resolve(root, "docs/verification/pi-sdk-smoke.json")
   : resolve(root, ".tmp/pi-sdk-smoke.json");
 const manifest = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
+// The frozen-pin check below must accept whatever exact version the manifest pins,
+// so a dependency bump does not silently require editing this script. The SDK pin is
+// still enforced: the manifest value has to be an exact version and has to equal the
+// installed one. Only the previously hard-coded "1.2.0" literal was a drift trap.
 const sdkVersions = Object.fromEntries(SDK_NAMES.map((name) => {
   const installed = JSON.parse(readFileSync(resolve(root, "node_modules", name, "package.json"), "utf8")).version;
-  if (manifest.devDependencies?.[name] !== installed || installed !== "1.2.0") {
-    throw new Error(`Smoke requires the frozen exact SDK pin for ${name}; manifest=${manifest.devDependencies?.[name]}, installed=${installed}`);
+  const pinned = manifest.devDependencies?.[name];
+  if (pinned !== installed || !/^\d+\.\d+\.\d+$/.test(String(installed))) {
+    throw new Error(`Smoke requires the frozen exact SDK pin for ${name}; manifest=${pinned}, installed=${installed}`);
   }
   return [name, installed];
 }));
+// Label/version assertions follow the same frozen pin validated above, so an SDK
+// bump does not silently desync the host_shell and case labels.
+const sdkVersion = sdkVersions["@earendil-works/pi-coding-agent"];
 const piManifest = JSON.parse(readFileSync(resolve(root, "node_modules/@earendil-works/pi-coding-agent/package.json"), "utf8"));
 const piCli = resolve(root, "node_modules/@earendil-works/pi-coding-agent", piManifest.bin.pi);
 const providerPath = resolve(root, "scripts/pi-sdk-smoke-provider.mjs");
@@ -196,26 +204,26 @@ try {
   const extensionLoad = caseResult("extension_load", await runPi(agentDir,
     rpcInput("get_commands"), (responses) => responses.some((row) => row?.command === "get_commands")
       && !!responses.find((row) => row?.type === "extension_ui_request" && row.method === "setStatus"
-        && typeof row.statusText === "string" && row.statusText.includes("pi-sdk-smoke/router-model"))), "1.2.0");
+        && typeof row.statusText === "string" && row.statusText.includes("pi-sdk-smoke/router-model"))), sdkVersion);
   const isFeatureComplete = (responses) => responses.some((row) => row?.type === "response"
     && row.command === "prompt" && row.success === true && row.data?.disposition === "handled")
     && responses.some((row) => row?.type === "extension_ui_request" && row.method === "notify"
       && typeof row.message === "string" && row.message.includes("active selection: pi-sdk-smoke/router-model"));
   const happyPath = caseResult("happy_path", await runPi(agentDir,
-    rpcInput("prompt", "?router-diagnostics-smoke"), isFeatureComplete), "1.2.0");
+    rpcInput("prompt", "?router-diagnostics-smoke"), isFeatureComplete), sdkVersion);
   const errorDir = makeFixture(true);
   let errorPath;
   try {
     errorPath = caseResult("error_path", await runPi(errorDir, rpcInput("get_state"), (responses) =>
       responses.some((row) => row?.command === "get_state") && responses.some((row) => row?.type === "extension_ui_request"
-        && row.method === "notify" && typeof row.message === "string" && row.message.includes("Model router config error:"))), "1.2.0");
+        && row.method === "notify" && typeof row.message === "string" && row.message.includes("Model router config error:"))), sdkVersion);
   } finally {
     rmSync(errorDir, { recursive: true, force: true });
   }
   // A second actual Pi process against the same isolated state exercises reload/restart cleanup.
   const reloadOutput = await runPi(agentDir, rpcInput("prompt", "?router-diagnostics-smoke"), isFeatureComplete);
-  const reloadCleanup = caseResult("reload_cleanup", reloadOutput, "1.2.0");
-  const cases = [extensionLoad, happyPath, errorPath, reloadCleanup, runHostShell("1.2.0")];
+  const reloadCleanup = caseResult("reload_cleanup", reloadOutput, sdkVersion);
+  const cases = [extensionLoad, happyPath, errorPath, reloadCleanup, runHostShell(sdkVersion)];
   const report = {
     schema_version: 1,
     verification_contract: VERIFICATION_CONTRACT,
