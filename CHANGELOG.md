@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.11] - 2026-11-04
+
+### Fixed
+
+- Start a session, fall back, and report status even when `ledger.json` or `state.json` is truncated or hand-edited. Those router-written files now degrade to their defaults and are rewritten on the next save, instead of raising an uncaught `SyntaxError` that aborted the extension handler. An unreadable `config.json` still surfaces a config warning.
+
 ## [0.5.10] - 2026-11-02
 
 ### Changed

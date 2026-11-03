@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -548,6 +549,54 @@ test("after_provider_response ignores error statuses when runtime fallback is di
   });
 });
 
+test("corrupt ledger file no longer aborts session start and is rewritten as valid JSON on commit", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, notifications, statuses, ledgerCounts, paths }) => {
+    await handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
+
+    assert.deepEqual(setModels, ["stored/model"]);
+    assert.deepEqual(notifications, []);
+    assert.equal(appended.length, 0);
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main stored/model [startup]" });
+    assert.deepEqual(await ledgerCounts(), {});
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+
+    assert.deepEqual(await ledgerCounts(), { "stored/model": 1 });
+    assert.doesNotThrow(
+      () => JSON.parse(readFileSync(paths.ledger, "utf8")),
+      "the damaged ledger file should be replaced by a valid one after the commit",
+    );
+  }, { includeStoredSelection: true, ledgerFileContents: '{"version":1,"days":{"2026-05-28":{"pools":' });
+});
+
+test("corrupt ledger file does not block a reload reselect or the ledger commit that follows", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, statuses, ledgerCounts }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+
+    assert.deepEqual(setModels, ["openai-codex/gpt-5.5"]);
+    assert.equal(appended.at(-1)?.data.reason, "reload");
+    assert.deepEqual(statuses.at(-1), { key: "model-router", value: "router:main openai-codex/gpt-5.5 [reload]" });
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+
+    assert.deepEqual(await ledgerCounts(), { "openai-codex/gpt-5.5": 1 });
+  }, { includeStoredSelection: false, ledgerFileContents: "not json at all" });
+});
+
+test("corrupt ledger file still allows runtime fallback on a provider error status", async () => {
+  await withHarness(async ({ handlers, ctx, setModels, appended, ledgerCounts }) => {
+    await handlers.session_start({ type: "session_start", reason: "reload" }, ctx);
+    setModels.length = 0;
+    appended.length = 0;
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 503, headers: {} }, ctx);
+
+    assert.deepEqual(setModels, ["cursor/gpt-5.5"]);
+    assert.equal(appended.at(-1)?.data.reason, "fallback");
+    assert.deepEqual(await ledgerCounts(), {});
+  }, { includeStoredSelection: false, ledgerFileContents: '{"version":1,"days":' });
+});
+
 /**
  * Creates an isolated temporary project, installs the mocked router extension,
  * and removes all project-local state after the supplied assertions complete.
@@ -573,6 +622,8 @@ interface HarnessOptions {
   entries?: ModelPoolEntry[];
   /** Merges extra router config, such as sessionBoundary overrides, into the fixture. */
   configPatch?: Partial<RouterConfig>;
+  /** Writes raw bytes to `ledger.json` before the extension loads, to simulate a damaged file. */
+  ledgerFileContents?: string;
 }
 
 /**
@@ -593,6 +644,7 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
     ...options.configPatch,
   };
   await writeConfig(paths.config, config);
+  if (options.ledgerFileContents !== undefined) await writeJsonFile(paths.ledger, options.ledgerFileContents);
 
   const storedSelection: SelectedModel = {
     pool: "main",
@@ -739,4 +791,10 @@ async function createHarness(cwd: string, options: HarnessOptions = {}) {
 async function writeJson(path: string, value: unknown): Promise<void> {
   const { writeFile } = await import("node:fs/promises");
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+/** Writes raw file bytes verbatim, used to simulate a truncated or hand-edited state file. */
+async function writeJsonFile(path: string, contents: string): Promise<void> {
+  const { writeFile } = await import("node:fs/promises");
+  await writeFile(path, contents, "utf8");
 }
