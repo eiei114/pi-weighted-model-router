@@ -57,18 +57,24 @@ async function readJsonIfExists(path: string): Promise<unknown | undefined> {
 }
 
 /**
- * Reads derived router state that must never break a Pi event handler.
+ * Reads derived router state that must survive a damaged file, but not a failing disk.
  *
- * `config.json` is user-authored, so a parse failure there is surfaced as a config
- * warning. `ledger.json` and `state.json` are router-written counters: a truncated or
- * hand-edited file degrades to the caller's default and is rewritten on the next save,
- * so one damaged file cannot abort session start or a provider fallback.
+ * `config.json` is user-authored, so a parse failure there is surfaced as a config warning.
+ * `ledger.json` and `state.json` are router-written counters: a truncated or hand-edited
+ * file (a JSON `SyntaxError`) degrades to the caller's default and is rewritten on the next
+ * save, so one damaged file cannot abort session start or a provider fallback.
+ *
+ * Filesystem errors are deliberately rethrown. Reporting an intact ledger as empty because
+ * its read failed would let the next successful commit rewrite the file from that empty
+ * baseline, silently deleting every recorded count. `ENOENT` is not seen here: the
+ * lower-level helper already maps a missing file to `undefined`.
  */
 async function readResilientJson(path: string): Promise<unknown | undefined> {
   try {
     return await readJsonIfExists(path);
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined;
+    throw error;
   }
 }
 

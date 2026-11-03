@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- Start a session, fall back, and report status even when `ledger.json` or `state.json` is truncated or hand-edited. Those router-written files now degrade to their defaults and are rewritten on the next save, instead of raising an uncaught `SyntaxError` that aborted the extension handler. An unreadable `config.json` still surfaces a config warning.
+- Start a session, fall back, and report status even when `ledger.json` or `state.json` is truncated or hand-edited. Those router-written files now degrade to their defaults and are rewritten on the next save, instead of raising an uncaught `SyntaxError` that aborted the extension handler. Only a JSON parse error is treated as damaged data: filesystem read errors such as `EACCES`, `EIO` or `EMFILE` still surface, so a ledger that cannot be read is never mistaken for an empty one and overwritten on the next commit. An unreadable `config.json` still surfaces a config warning.
 
 ## [0.5.10] - 2026-11-02
 

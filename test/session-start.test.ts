@@ -8,6 +8,7 @@ import weightedModelRouter from "../src/index.js";
 import { todayKey } from "../src/keys.js";
 import { successCounts } from "../src/ledger.js";
 import { readLedger, routerPaths, writeConfig } from "../src/storage.js";
+import { withReadFileFault } from "./helpers/read-file-fault.js";
 import type { ModelPoolEntry, RouterConfig, SelectedModel, SessionStartReason } from "../src/types.js";
 
 const SELECTION_ENTRY = "weighted-model-router-selection";
@@ -595,6 +596,38 @@ test("corrupt ledger file still allows runtime fallback on a provider error stat
     assert.equal(appended.at(-1)?.data.reason, "fallback");
     assert.deepEqual(await ledgerCounts(), {});
   }, { includeStoredSelection: false, ledgerFileContents: '{"version":1,"days":' });
+});
+
+/**
+ * Regression for the data-loss path an over-broad `catch` would reintroduce: a corrupt file
+ * may degrade to a default, but an intact file whose read fails must not. If the failure were
+ * reported as an empty ledger, the commit below would rewrite `ledger.json` from that empty
+ * baseline and delete the counts recorded earlier.
+ */
+test("an unreadable ledger read is propagated and never resets the intact ledger file", async () => {
+  const seeded = JSON.stringify({
+    version: 1,
+    days: { [todayKey()]: { pools: { main: { success: { "stored/model": 5 }, failure: {} } } } },
+  });
+
+  await withHarness(async ({ handlers, ctx, setModels, ledgerCounts, paths }) => {
+    const original = readFileSync(paths.ledger, "utf8");
+    assert.deepEqual(await ledgerCounts(), { "stored/model": 5 });
+
+    await assert.rejects(
+      withReadFileFault(paths.ledger, "EACCES", () => handlers.session_start({ type: "session_start", reason: "startup" }, ctx)),
+      (error: NodeJS.ErrnoException) => error.code === "EACCES",
+    );
+    assert.deepEqual(setModels, [], "an unreadable ledger must not let the session continue on a fabricated empty ledger");
+    assert.equal(readFileSync(paths.ledger, "utf8"), original, "the intact ledger file must be left untouched");
+
+    await handlers.session_start({ type: "session_start", reason: "startup" }, ctx);
+    assert.deepEqual(setModels, ["stored/model"]);
+
+    await handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: {} }, ctx);
+
+    assert.deepEqual(await ledgerCounts(), { "stored/model": 6 }, "the commit must add to the preserved counts, not replace them");
+  }, { includeStoredSelection: true, ledgerFileContents: seeded });
 });
 
 /**
