@@ -55,6 +55,22 @@ test("readLedger degrades a non-JSON ledger file to an empty ledger instead of t
   });
 });
 
+/**
+ * Pins the other half of the degraded-read contract: valid JSON reaches
+ * `validateLedgerShape` outside the parse catch, so shape rejection has to return the
+ * empty ledger rather than throw. Widening the catch would hide a throwing validator.
+ */
+test("readLedger degrades a parseable but invalid ledger file to an empty ledger", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, "ledger.json");
+    await writeFile(path, '{"version":1,"days":null}', "utf8");
+
+    const loaded = await readLedger(path);
+
+    assert.deepEqual(loaded, emptyLedger());
+  });
+});
+
 test("readLedger returns an empty ledger when the ledger file does not exist yet", async () => {
   await withTempDir(async (dir) => {
     const loaded = await readLedger(join(dir, "ledger.json"));
