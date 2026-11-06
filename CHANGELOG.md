@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.11] - 2026-11-07
+
+### Changed
+
+- Pin the Pi SDK dev/test dependencies to 1.5.0, align TypeBox with the host, and preserve the tool action enum schema typing.
+
 ## [0.5.10] - 2026-11-02
 
 ### Changed
