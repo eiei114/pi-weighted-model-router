@@ -1,6 +1,6 @@
 {
   "name": "pi-weighted-model-router",
-  "version": "0.5.11",
+  "version": "0.5.12",
   "description": "Pi extension that balances model/provider usage across weighted model pools.",
   "type": "module",
   "license": "MIT",
@@ -50,13 +50,13 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-agent-core": "1.4.0",
-    "@earendil-works/pi-ai": "1.4.0",
-    "@earendil-works/pi-coding-agent": "1.4.0",
-    "@earendil-works/pi-tui": "1.4.0",
+    "@earendil-works/pi-agent-core": "1.5.0",
+    "@earendil-works/pi-ai": "1.5.0",
+    "@earendil-works/pi-coding-agent": "1.5.0",
+    "@earendil-works/pi-tui": "1.5.0",
     "@types/node": "^26.1.1",
     "tsx": "^4.22.3",
-    "typebox": "^1.1.38",
+    "typebox": "1.3.27",
     "typescript": "^7.0.2"
   }
 }
