@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.13] - 2026-11-08
+
+### Fixed
+
+- Write `ledger.json` to a same-directory temporary file before atomically replacing it, preserving the previous ledger if a write or rename fails.
+
 ## [0.5.12] - 2026-11-08
 
 ### Fixed
