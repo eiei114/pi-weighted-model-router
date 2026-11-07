@@ -30,6 +30,7 @@ import type {
 const SELECTION_ENTRY = "weighted-model-router-selection";
 const STATUS_KEY = "model-router";
 const PACKAGE_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+type RouterToolAction = "read" | "status" | "diagnostics" | "validate" | "save";
 
 export default function weightedModelRouter(pi: ExtensionAPI) {
   let paths = routerPaths(getAgentDir());
@@ -487,7 +488,7 @@ export default function weightedModelRouter(pi: ExtensionAPI) {
       "Use model_router_config with action=save only after preparing the complete JSON config for the user; the tool asks for confirmation before writing.",
     ],
     parameters: Type.Object({
-      action: StringEnum(["read", "status", "diagnostics", "validate", "save"] as const),
+      action: Type.Unsafe<RouterToolAction>(StringEnum(["read", "status", "diagnostics", "validate", "save"] as const)),
       configJson: Type.Optional(Type.String({ description: "Full RouterConfig JSON for validate or save." })),
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
