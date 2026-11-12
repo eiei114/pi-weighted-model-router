@@ -85,6 +85,36 @@ test("readLedger returns an empty ledger when the ledger file does not exist yet
   });
 });
 
+test("writeLedger flushes the temporary file before replacing the previous ledger", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, "ledger.json");
+    const previous = emptyLedger();
+    previous.days["2026-05-28"] = { pools: { main: { success: { model: 7 }, failure: {} } } };
+    const next = emptyLedger();
+    next.days["2026-05-28"] = { pools: { main: { success: { model: 8 }, failure: {} } } };
+    await writeLedger(path, previous);
+
+    const tempWrites: unknown[] = [];
+    await withPatchedFsOperation("writeFile", (original) => async (...args) => {
+      const file = args[0];
+      if (typeof file === "string" && dirname(file) === dir && basename(file).startsWith(".ledger.json.")) {
+        tempWrites.push(args[2]);
+      }
+      return original(...args);
+    }, async () => {
+      await writeLedger(path, next);
+    });
+
+    assert.equal(tempWrites.length, 1, "the ledger should be written through exactly one temporary file");
+    assert.equal(
+      (tempWrites[0] as { flush?: boolean } | undefined)?.flush,
+      true,
+      "the temporary ledger must be fsynced before rename, or a crash can leave an empty ledger",
+    );
+    assert.deepEqual(await readLedger(path), next);
+  });
+});
+
 test("writeLedger leaves the previous ledger readable when a temporary write is interrupted", async () => {
   await withTempDir(async (dir) => {
     const path = join(dir, "ledger.json");

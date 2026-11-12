@@ -93,7 +93,10 @@ async function writeJsonAtomically(path: string, value: unknown): Promise<void> 
   const tempPath = join(dir, `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
 
   try {
-    await writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+    // `flush` fsyncs the temporary file before `rename` makes it visible. Without it a crash
+    // shortly after this returns can leave the replaced ledger empty on filesystems that do
+    // not order data before rename, and the degraded read would then reset the counts.
+    await writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", flag: "wx", flush: true });
     await renameWithRetry(tempPath, path);
   } finally {
     // A failed or interrupted write only leaves the temporary file behind; never remove the
