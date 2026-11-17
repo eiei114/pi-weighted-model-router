@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import type * as FsPromises from "node:fs/promises";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire, syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import test from "node:test";
+import { validateConfigShape } from "../src/config.js";
 import { emptyLedger } from "../src/ledger.js";
-import { readLedger, readState, writeLedger, writeState } from "../src/storage.js";
+import { readConfig, readLedger, readState, writeConfig, writeLedger, writeState } from "../src/storage.js";
+import type { RouterConfig } from "../src/types.js";
 import { withReadFileFault } from "./helpers/read-file-fault.js";
 
 const fsPromises = createRequire(import.meta.url)("node:fs/promises") as typeof FsPromises;
@@ -168,6 +170,136 @@ for (const code of ["EPERM", "EBUSY"]) {
     });
   });
 }
+
+function sampleConfig(weight: number): RouterConfig {
+  return {
+    version: 1,
+    defaultPool: "main",
+    pools: { main: { entries: [{ provider: "openai-codex", model: "gpt-5.5", weight }] } },
+  };
+}
+
+async function listTempFiles(dir: string): Promise<string[]> {
+  return (await readdir(dir)).filter((entry) => entry.endsWith(".tmp"));
+}
+
+test("writeConfig flushes the temporary file before replacing the previous config", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, "config.json");
+    const previous = sampleConfig(7);
+    const next = sampleConfig(8);
+    await writeConfig(path, previous);
+
+    const tempWrites: unknown[] = [];
+    await withPatchedFsOperation("writeFile", (original) => async (...args) => {
+      const file = args[0];
+      if (typeof file === "string" && dirname(file) === dir && basename(file).startsWith(".config.json.")) {
+        tempWrites.push(args[2]);
+      }
+      return original(...args);
+    }, async () => {
+      await writeConfig(path, next);
+    });
+
+    assert.equal(tempWrites.length, 1, "the config should be written through exactly one temporary file");
+    assert.equal(
+      (tempWrites[0] as { flush?: boolean } | undefined)?.flush,
+      true,
+      "the temporary config must be fsynced before rename, or a crash can leave an empty config",
+    );
+    assert.deepEqual(await readConfig(path), validateConfigShape(next));
+  });
+});
+
+test("writeConfig keeps 2-space JSON formatting plus a trailing newline", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, "config.json");
+    const config = sampleConfig(7);
+
+    await writeConfig(path, config);
+
+    const raw = await readFile(path, "utf8");
+    assert.equal(raw, `${JSON.stringify(validateConfigShape(config), null, 2)}\n`);
+  });
+});
+
+test("writeConfig leaves the previous config readable when a temporary write is interrupted", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, "config.json");
+    const previous = sampleConfig(7);
+    const next = sampleConfig(8);
+    await writeConfig(path, previous);
+
+    let interrupted = false;
+    await withPatchedFsOperation("writeFile", (original) => async (...args) => {
+      const file = args[0];
+      if (typeof file === "string" && dirname(file) === dir && basename(file).startsWith(".config.json.")) {
+        interrupted = true;
+        await original(file, '{"version":1,"defaultPool":', "utf8");
+        throw createFsFault("EIO", file, "writeFile");
+      }
+      return original(...args);
+    }, async () => {
+      await assert.rejects(writeConfig(path, next), (error: NodeJS.ErrnoException) => error.code === "EIO");
+    });
+
+    assert.equal(interrupted, true, "the temporary-file write fault should be injected");
+    assert.deepEqual(await readConfig(path), validateConfigShape(previous));
+    assert.deepEqual(await listTempFiles(dir), [], "no temporary config file should be left behind");
+  });
+});
+
+for (const code of ["EPERM", "EBUSY"]) {
+  test(`writeConfig preserves the existing file when rename keeps failing with ${code}`, async () => {
+    await withTempDir(async (dir) => {
+      const path = join(dir, "config.json");
+      const previous = sampleConfig(7);
+      const next = sampleConfig(8);
+      await writeConfig(path, previous);
+
+      let renameAttempts = 0;
+      await withPatchedFsOperation("rename", (original) => async (...args) => {
+        if (args[1] === path) {
+          renameAttempts += 1;
+          throw createFsFault(code, String(args[0]), "rename");
+        }
+        return original(...args);
+      }, async () => {
+        await assert.rejects(writeConfig(path, next), (error: NodeJS.ErrnoException) => error.code === code);
+      });
+
+      assert.equal(renameAttempts, 4, "rename should make one initial attempt and three bounded retries");
+      assert.deepEqual(await readConfig(path), validateConfigShape(previous));
+      assert.deepEqual(await listTempFiles(dir), [], "no temporary config file should be left behind");
+    });
+  });
+}
+
+test("writeState leaves the previous state readable when a temporary write is interrupted", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, "state.json");
+    const previous = { version: 1, configMissingNoticeShown: true } as const;
+    const next = { version: 1, configMissingNoticeShown: false } as const;
+    await writeState(path, previous);
+
+    let interrupted = false;
+    await withPatchedFsOperation("writeFile", (original) => async (...args) => {
+      const file = args[0];
+      if (typeof file === "string" && dirname(file) === dir && basename(file).startsWith(".state.json.")) {
+        interrupted = true;
+        await original(file, '{"version":1,', "utf8");
+        throw createFsFault("EIO", file, "writeFile");
+      }
+      return original(...args);
+    }, async () => {
+      await assert.rejects(writeState(path, next), (error: NodeJS.ErrnoException) => error.code === "EIO");
+    });
+
+    assert.equal(interrupted, true, "the temporary-file write fault should be injected");
+    assert.deepEqual(await readState(path), previous);
+    assert.deepEqual(await listTempFiles(dir), [], "no temporary state file should be left behind");
+  });
+});
 
 /**
  * Guards the finder-visible data-loss path: an intact ledger whose read fails must not be

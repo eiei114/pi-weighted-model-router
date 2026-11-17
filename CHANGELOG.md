@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.14] - 2026-11-18
+
+### Fixed
+
+- Write `config.json` and `state.json` to a same-directory temporary file, fsync it, then atomically rename it into place, preserving the previous file if a write or rename fails. A failed save no longer risks truncating the user's hand-authored pool weights.
+
 ## [0.5.13] - 2026-11-08
 
 ### Fixed
