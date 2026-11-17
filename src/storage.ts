@@ -23,7 +23,7 @@ export async function readConfig(path: string): Promise<RouterConfig | undefined
 }
 
 export async function writeConfig(path: string, config: RouterConfig): Promise<void> {
-  await writeJson(path, validateConfigShape(config));
+  await writeJsonAtomically(path, validateConfigShape(config));
 }
 
 export async function readLedger(path: string): Promise<RouterLedger> {
@@ -45,7 +45,7 @@ export async function readState(path: string): Promise<RouterState> {
 }
 
 export async function writeState(path: string, state: RouterState): Promise<void> {
-  await writeJson(path, state);
+  await writeJsonAtomically(path, state);
 }
 
 async function readJsonIfExists(path: string): Promise<unknown | undefined> {
@@ -79,11 +79,6 @@ async function readResilientJson(path: string): Promise<unknown | undefined> {
   }
 }
 
-async function writeJson(path: string, value: unknown): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-}
-
 const MAX_RENAME_RETRIES = 3;
 const INITIAL_RENAME_RETRY_DELAY_MS = 10;
 
@@ -94,13 +89,13 @@ async function writeJsonAtomically(path: string, value: unknown): Promise<void> 
 
   try {
     // `flush` fsyncs the temporary file before `rename` makes it visible. Without it a crash
-    // shortly after this returns can leave the replaced ledger empty on filesystems that do
+    // shortly after this returns can leave the replaced file empty on filesystems that do
     // not order data before rename, and the degraded read would then reset the counts.
     await writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", flag: "wx", flush: true });
     await renameWithRetry(tempPath, path);
   } finally {
     // A failed or interrupted write only leaves the temporary file behind; never remove the
-    // existing ledger as a fallback for a rename that could not replace it.
+    // existing file as a fallback for a rename that could not replace it.
     await rm(tempPath, { force: true }).catch(() => undefined);
   }
 }
