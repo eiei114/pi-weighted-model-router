@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
-  behaviorAssertions, parseJsonLines, rpcStdoutAssertion, stdinWriteAssertion, writeStdin,
+  behaviorAssertions, parseJsonLines, redactHostState, rpcStdoutAssertion, stdinWriteAssertion, writeStdin,
 } from "../scripts/pi-sdk-smoke-contract.mjs";
 
 function rows(...values) { return values; }
@@ -62,6 +62,14 @@ test("JSONL parser rejects malformed records and defers an incomplete stdout tai
     [{ type: "response" }]);
   assert.throws(() => parseJsonLines('{"type":"response"}\nnot-json\n', { allowIncompleteTail: true }),
     /Invalid JSONL record/);
+});
+
+test("curated smoke evidence redacts host state from RPC output", () => {
+  const output = '{"type":"response","command":"get_state","data":{"model":{"id":"private-model",'
+    + '"provider":"private-provider","baseUrl":"https://private.example"},"thinkingLevel":"high"}}\n';
+  const redacted = redactHostState(output);
+  assert.match(redacted, /<redacted-host-state>/);
+  assert.doesNotMatch(redacted, /private-model|private-provider|private\.example|thinkingLevel/);
 });
 
 test("early child close records a stdin stream failure in its case assertion", async () => {

@@ -21,6 +21,28 @@ export function parseJsonLines(output, { allowIncompleteTail = false } = {}) {
   });
 }
 
+export function redactHostState(output) {
+  const redact = (value) => {
+    if (Array.isArray(value)) return value.map(redact);
+    if (!value || typeof value !== "object") return value;
+    if (value.type === "response" && value.command === "get_state") {
+      return { type: value.type, command: value.command, success: value.success, data: "<redacted-host-state>" };
+    }
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [
+      key,
+      key === "model" && child && typeof child === "object" ? "<redacted-model>" : redact(child),
+    ]));
+  };
+  return output.split(/\r?\n/).map((line) => {
+    if (!line.trim()) return line;
+    try {
+      return JSON.stringify(redact(JSON.parse(line)));
+    } catch {
+      return line;
+    }
+  }).join("\n");
+}
+
 export function writeStdin(stream, input) {
   let writeError;
   stream.on("error", (error) => { writeError ??= error; });
