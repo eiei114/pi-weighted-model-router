@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import {
-  behaviorAssertions, EXTENSION_LOAD_ERROR_PATTERN, parseJsonLines, SDK_NAMES,
+  behaviorAssertions, EXTENSION_LOAD_ERROR_PATTERN, parseJsonLines, redactHostState, SDK_NAMES,
   rpcStdoutAssertion, stdinWriteAssertion, UNHANDLED_ERROR_PATTERN, VERIFICATION_CONTRACT, writeStdin,
 } from "./pi-sdk-smoke-contract.mjs";
 
@@ -164,7 +164,8 @@ function caseResult(name, execution, expectedVersion) {
     return text.replace(/("id"\s*:\s*")[0-9a-f-]{36}("|)/gi, "$1<opaque-id>$2")
       .replace(/("sessionId"\s*:\s*")[0-9a-f-]{36}("|)/gi, "$1<session-id>$2");
   };
-  const evidence = redact(execution.fullOutput).slice(-EVIDENCE_BYTES) || execution.spawnError || "No output captured";
+  const evidence = redactHostState(redact(execution.fullOutput)).slice(-EVIDENCE_BYTES)
+    || execution.spawnError || "No output captured";
   const safeAssertions = assertions.map((item) => ({ ...item, observed: redact(item.observed) }));
   return {
     name,

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.15] - 2026-11-18
+
+### Changed
+
+- Update the Pi SDK development and test dependencies to 1.5.2, including the resolved SDK package graph.
+
 ## [0.5.14] - 2026-11-18
 
 ### Fixed
