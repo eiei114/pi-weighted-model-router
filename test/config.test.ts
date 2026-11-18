@@ -281,6 +281,33 @@ const rejectionCases: RejectionCase[] = [
     },
     message: "runtimeFallback.statuses[0] must be an HTTP status code.",
   },
+  {
+    name: "an unknown strategy string",
+    make: () => {
+      const config = freshConfig();
+      config.strategy = "round-robin";
+      return config;
+    },
+    message: 'strategy must be "smooth-weighted-daily".',
+  },
+  {
+    name: "a non-string strategy value",
+    make: () => {
+      const config = freshConfig();
+      config.strategy = 42;
+      return config;
+    },
+    message: 'strategy must be "smooth-weighted-daily".',
+  },
+  {
+    name: "a null strategy value",
+    make: () => {
+      const config = freshConfig();
+      config.strategy = null;
+      return config;
+    },
+    message: 'strategy must be "smooth-weighted-daily".',
+  },
 ];
 
 for (const rejectionCase of rejectionCases) {
@@ -294,10 +321,10 @@ test("defaultConfig round-trips through validateConfigShape", () => {
   assert.deepEqual(validateConfigShape(config), config);
 });
 
-test("an unknown strategy normalizes to smooth-weighted-daily", () => {
-  const value = freshConfig();
-  value.strategy = "round-robin";
-  assert.equal(validateConfigShape(value).strategy, "smooth-weighted-daily");
+test("an omitted strategy defaults to smooth-weighted-daily", () => {
+  const config = freshConfig();
+  Reflect.deleteProperty(config, "strategy");
+  assert.equal(validateConfigShape(config).strategy, "smooth-weighted-daily");
 });
 
 test("duplicate session reasons are de-duplicated", () => {
