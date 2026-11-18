@@ -85,11 +85,16 @@ export function validateConfigShape(value: unknown): RouterConfig {
     pools[poolName] = { entries };
   }
 
+  const strategy = value.strategy === undefined ? "smooth-weighted-daily" : value.strategy;
+  if (strategy !== "smooth-weighted-daily") {
+    throw new Error('strategy must be "smooth-weighted-daily".');
+  }
+
   const config: RouterConfig = {
     version: CONFIG_VERSION,
     defaultPool: value.defaultPool,
     pools,
-    strategy: value.strategy === "smooth-weighted-daily" ? value.strategy : "smooth-weighted-daily",
+    strategy,
   };
 
   if (isRecord(value.sessionBoundary)) {
