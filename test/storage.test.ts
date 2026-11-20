@@ -301,6 +301,32 @@ test("writeState leaves the previous state readable when a temporary write is in
   });
 });
 
+for (const code of ["EPERM", "EBUSY"]) {
+  test(`writeState preserves the existing file when rename keeps failing with ${code}`, async () => {
+    await withTempDir(async (dir) => {
+      const path = join(dir, "state.json");
+      const previous = { version: 1, configMissingNoticeShown: true } as const;
+      const next = { version: 1, configMissingNoticeShown: false } as const;
+      await writeState(path, previous);
+
+      let renameAttempts = 0;
+      await withPatchedFsOperation("rename", (original) => async (...args) => {
+        if (args[1] === path) {
+          renameAttempts += 1;
+          throw createFsFault(code, String(args[0]), "rename");
+        }
+        return original(...args);
+      }, async () => {
+        await assert.rejects(writeState(path, next), (error: NodeJS.ErrnoException) => error.code === code);
+      });
+
+      assert.equal(renameAttempts, 4, "rename should make one initial attempt and three bounded retries");
+      assert.deepEqual(await readState(path), previous);
+      assert.deepEqual(await listTempFiles(dir), [], "no temporary state file should be left behind");
+    });
+  });
+}
+
 /**
  * Guards the finder-visible data-loss path: an intact ledger whose read fails must not be
  * reported as an empty ledger, because the next successful commit would then rewrite the
