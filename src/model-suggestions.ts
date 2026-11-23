@@ -49,12 +49,13 @@ export function suggestModels(
   registeredModels: RegisteredModelLike[],
   limit = MAX_SUGGESTIONS_PER_MODEL,
 ): string[] {
-  return registeredModels
+  const rankedKeys = registeredModels
     .map((model) => scoreCandidate(entry, model))
     .filter((candidate) => candidate.score > 0)
     .sort((left, right) => right.score - left.score || left.key.localeCompare(right.key))
-    .slice(0, limit)
     .map((candidate) => candidate.key);
+
+  return [...new Set(rankedKeys)].slice(0, limit);
 }
 
 function scoreCandidate(entry: ModelPoolEntry, model: RegisteredModelLike): CandidateScore {
