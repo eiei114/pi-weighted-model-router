@@ -343,6 +343,12 @@ test("an empty runtimeFallback applies enabled and default statuses", () => {
   assert.deepEqual(config.runtimeFallback?.statuses, [...DEFAULT_FALLBACK_STATUSES]);
 });
 
+test("an explicit empty runtime fallback status list keeps provider-response fallback on the defaults", () => {
+  const config = validateConfigShape({ ...defaultConfig(), runtimeFallback: { statuses: [] } });
+  assert.equal(runtimeFallbackEnabled(config), true);
+  assert.deepEqual(fallbackStatuses(config), new Set(DEFAULT_FALLBACK_STATUSES));
+});
+
 test("a partial runtimeFallback defaults only the missing field", () => {
   const disabled = freshConfig();
   disabled.runtimeFallback = { enabled: false };
