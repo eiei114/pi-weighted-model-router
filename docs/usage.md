@@ -64,6 +64,32 @@ Provider and model IDs must exist in Pi's model registry. If a model is register
 
 `sessionBoundary` is optional. Defaults restore the saved model for `startup` and `resume`, but reselect on `new`, `reload`, and `fork` even when the previous session contains a saved router selection.
 
+## Runtime fallback
+
+Provider-response fallback is enabled by default. When `runtimeFallback.statuses` is omitted (including when the entire `runtimeFallback` section is omitted) or set to `[]`, the router uses the default HTTP statuses: `400`, `429`, `500`, `502`, `503`, and `504`. A nonempty list replaces the defaults rather than adding to them.
+
+To fall back only on `429` and `503`, replace the top-level `runtimeFallback` section of your config with:
+
+```json
+{
+  "runtimeFallback": {
+    "statuses": [429, 503]
+  }
+}
+```
+
+To disable provider-response fallback, use `enabled: false` instead of an empty list:
+
+```json
+{
+  "runtimeFallback": {
+    "enabled": false
+  }
+}
+```
+
+This disables fallback triggered by provider responses only. It does not disable capability-based model selection.
+
 ## Session boundary behavior
 
 The router decides whether to restore or reselect based on the session start reason. Defaults are:
