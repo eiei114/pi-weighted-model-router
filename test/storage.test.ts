@@ -144,6 +144,31 @@ test("writeLedger leaves the previous ledger readable when a temporary write is 
   });
 });
 
+test("writeLedger replaces the existing ledger after a transient rename failure", async () => {
+  await withTempDir(async (dir) => {
+    const path = join(dir, "ledger.json");
+    const previous = emptyLedger();
+    previous.days["2026-05-28"] = { pools: { main: { success: { model: 7 }, failure: {} } } };
+    const next = emptyLedger();
+    next.days["2026-05-28"] = { pools: { main: { success: { model: 8 }, failure: {} } } };
+    await writeLedger(path, previous);
+
+    let renameAttempts = 0;
+    await withPatchedFsOperation("rename", (original) => async (...args) => {
+      if (args[1] === path && ++renameAttempts === 1) {
+        throw createFsFault("EBUSY", String(args[0]), "rename");
+      }
+      return original(...args);
+    }, async () => {
+      await writeLedger(path, next);
+    });
+
+    assert.equal(renameAttempts, 2, "rename should succeed on the first retry");
+    assert.deepEqual(await readLedger(path), next);
+    assert.deepEqual(await readdir(dir), ["ledger.json"], "no temporary sibling should remain");
+  });
+});
+
 for (const code of ["EPERM", "EBUSY"]) {
   test(`writeLedger preserves the existing file when rename keeps failing with ${code}`, async () => {
     await withTempDir(async (dir) => {
